@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Leaderboard — Prompt Relay{% endblock %}
+
+{% block content %}
+<section class="card">
+    <div class="row-between">
+        <h1>Leaderboard</h1>
+        <span class="pill"><span class="live-dot"></span>Live</span>
+    </div>
+    <p class="lede">Ranked by details captured, then similarity as the tiebreaker. New results appear the moment a group finishes.</p>
+
+    <div class="table-wrap">
+        <table class="leaderboard">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Image</th>
+                    <th>Group</th>
+                    <th>Details</th>
+                    <th>Similarity</th>
+                </tr>
+            </thead>
+            {# Server-rendered rows so the board works even without JS/CDN;
+               leaderboard.js re-renders from the embedded JSON and then live-updates. #}
+            <tbody id="board-body">
+                {% for r in rows %}
+                <tr>
+                    <td class="rank">{{ loop.index }}</td>
+                    <td>{% if r.final_image_url %}<img class="thumb" src="{{ r.final_image_url }}" alt="" />{% endif %}</td>
+                    <td>{{ r.group_name }}</td>
+                    <td><span class="pill">{{ r.detail_score }} / 10</span></td>
+                    <td>{{ (r.similarity * 100) | round | int }}%</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div id="empty-state" class="empty-state" {% if rows %}style="display:none"{% endif %}>
+            No games finished yet — be the first!
+        </div>
+    </div>
+</section>
+
+{# Initial data + public read-only config handed to the realtime script. #}
+<script id="initial-rows" type="application/json">{{ rows | tojson }}</script>
+<script>
+    window.__SUPABASE__ = {
+        url: {{ supabase_url | tojson }},
+        anonKey: {{ supabase_anon_key | tojson }}
+    };
+</script>
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="/static/js/leaderboard.js"></script>
+{% endblock %}
