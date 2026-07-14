@@ -40,8 +40,9 @@ def _error_page(request: Request, message: str, retry_url: str, status_code: int
         The rendered error page response.
     """
     return templates.TemplateResponse(
+        request,
         "error.html",
-        {"request": request, "message": message, "retry_url": retry_url},
+        {"message": message, "retry_url": retry_url},
         status_code=status_code,
     )
 
@@ -56,7 +57,7 @@ def index(request: Request) -> HTMLResponse:
     Returns:
         The rendered index page.
     """
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(request, "index.html", {})
 
 
 @app.post("/game")
@@ -99,9 +100,9 @@ def reference_reveal(request: Request, game_id: str) -> HTMLResponse:
     image_url = storage.ensure_reference_uploaded(reference)
     settings = get_settings()
     return templates.TemplateResponse(
+        request,
         "reference.html",
         {
-            "request": request,
             "game": current,
             "reference_image_url": image_url,
             "details": reference.details,
@@ -138,9 +139,9 @@ def round_screen(request: Request, game_id: str, n: int) -> HTMLResponse:
 
     settings = get_settings()
     return templates.TemplateResponse(
+        request,
         "round.html",
         {
-            "request": request,
             "game": current,
             "step": n,
             "total_steps": game.TOTAL_STEPS,
@@ -224,9 +225,9 @@ def reveal(request: Request, game_id: str) -> HTMLResponse:
     similarity_pct = round(float(current.get("similarity") or 0) * 100)
 
     return templates.TemplateResponse(
+        request,
         "reveal.html",
         {
-            "request": request,
             "game": current,
             "reference_image_url": reference_image_url,
             "details": reference.details,
@@ -259,9 +260,9 @@ def leaderboard(request: Request) -> HTMLResponse:
         return _error_page(request, str(exc), "/", status_code=500)
 
     return templates.TemplateResponse(
+        request,
         "leaderboard.html",
         {
-            "request": request,
             "rows": rows,
             # Public, read-only credentials — safe to embed in the page.
             "supabase_url": settings.supabase_url,

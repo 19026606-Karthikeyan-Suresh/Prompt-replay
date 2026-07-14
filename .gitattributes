@@ -1,0 +1,7 @@
+# Normalize text line endings in the repo; check out native on each platform.
+* text=auto
+
+# Treat images as binary so git never mangles them with EOL conversion.
+*.png binary
+*.jpg binary
+*.jpeg binary
