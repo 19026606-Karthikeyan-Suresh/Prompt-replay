@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Step {{ step }} of {{ total_steps }} — Prompt Relay{% endblock %}
+
+{% block content %}
+<section class="card round-card">
+    <div class="row-between">
+        <div>
+            <p class="eyebrow">{{ game.group_name }} · Step {{ step }} of {{ total_steps }}</p>
+            <h1>{{ player }}, you're up!</h1>
+        </div>
+        <div id="timer" class="timer big" data-seconds="{{ seconds }}"
+             data-mode="submit" data-target="prompt-form">{{ seconds }}</div>
+    </div>
+
+    <p class="lede">
+        {% if step == 1 %}
+            Describe the target image from scratch — this prompt <strong>generates</strong> the base picture.
+        {% else %}
+            Describe what to <strong>add or change</strong> on the current image below. Don't restart it.
+        {% endif %}
+        Describe the <strong>picture on screen</strong>, never the original reference.
+    </p>
+
+    <div class="round-grid">
+        <div class="canvas-frame">
+            {% if current_image_url %}
+                <img class="canvas-img" src="{{ current_image_url }}" alt="Current image" />
+            {% else %}
+                <div class="canvas-blank">Blank canvas<br /><span>Step 1 creates the base image</span></div>
+            {% endif %}
+        </div>
+
+        <form id="prompt-form" class="stack prompt-form" action="{{ post_url }}" method="post">
+            <label class="field">
+                <span>Your 30-second prompt</span>
+                <textarea id="prompt" name="prompt" rows="6" maxlength="500"
+                          placeholder="e.g. add a red umbrella and a black cat in the rain"
+                          autofocus></textarea>
+            </label>
+            <button class="btn primary" type="submit">Submit now →</button>
+            <p class="muted">Auto-submits when the timer reaches 0. An empty box forfeits this turn.</p>
+        </form>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/timer.js"></script>
+<script src="/static/js/game.js"></script>
+{% endblock %}

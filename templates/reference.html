@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Reference reveal — Player 1 only{% endblock %}
+
+{% block content %}
+<section class="card reveal-card">
+    <div class="row-between">
+        <h1>Player 1 only 👀</h1>
+        {# The timer element is driven by static/js/timer.js via its data-* attrs. #}
+        <div id="timer" class="timer big" data-seconds="{{ seconds }}"
+             data-mode="redirect" data-target="{{ next_url }}">{{ seconds }}</div>
+    </div>
+
+    <p class="lede">
+        Memorise this image. When the timer hits 0 it hides for the rest of the game and
+        Step 1 begins. You may <strong>coach your team out loud</strong> — just never show them the picture.
+    </p>
+
+    <div class="canvas-frame">
+        <img class="canvas-img" src="{{ reference_image_url }}" alt="Reference image (player 1 only)" />
+    </div>
+
+    <details class="details-hint">
+        <summary>Peek at the 10 target details (optional — for Player 1)</summary>
+        <ul class="detail-list">
+            {% for d in details %}<li>{{ d }}</li>{% endfor %}
+        </ul>
+    </details>
+
+    <p class="muted">Not advancing automatically? <a href="{{ next_url }}">Start Step 1 →</a></p>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/timer.js"></script>
+{% endblock %}

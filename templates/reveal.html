@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Results — {{ game.group_name }}{% endblock %}
+
+{% block content %}
+<section class="card">
+    <p class="eyebrow">{{ game.group_name }}</p>
+    <h1>The reveal 🎉</h1>
+
+    <div class="score-row">
+        <div class="score-badge">
+            <span class="score-num">{{ detail_score }}</span><span class="score-den">/ 10</span>
+            <span class="score-label">details captured</span>
+        </div>
+        <div class="score-badge subtle">
+            <span class="score-num">{{ similarity_pct }}%</span>
+            <span class="score-label">similarity (tiebreaker)</span>
+        </div>
+    </div>
+</section>
+
+<section class="card">
+    <h2>Reference vs. your final image</h2>
+    <div class="compare-grid">
+        <figure>
+            <div class="canvas-frame">
+                <img class="canvas-img" src="{{ reference_image_url }}" alt="Reference image" />
+            </div>
+            <figcaption>The hidden reference</figcaption>
+        </figure>
+        <figure>
+            <div class="canvas-frame">
+                {% if final_image_url %}
+                    <img class="canvas-img" src="{{ final_image_url }}" alt="Final image" />
+                {% else %}
+                    <div class="canvas-blank">Blank — every turn was forfeited</div>
+                {% endif %}
+            </div>
+            <figcaption>Your final image</figcaption>
+        </figure>
+    </div>
+</section>
+
+<section class="card">
+    <h2>The 10 details</h2>
+    <ul class="verdict-list">
+        {% for v in verdicts %}
+        <li class="verdict {{ 'hit' if v.present else 'miss' }}">
+            <span class="mark">{{ '✓' if v.present else '✗' }}</span>
+            <span class="detail">{{ v.detail }}</span>
+            <span class="reason">{{ v.reason }}</span>
+        </li>
+        {% endfor %}
+    </ul>
+</section>
+
+<section class="card">
+    <h2>The relay, step by step</h2>
+    <div class="relay-grid">
+        {% for s in steps %}
+        <figure class="relay-step">
+            <div class="canvas-frame small">
+                {% if s.image_url %}
+                    <img class="canvas-img" src="{{ s.image_url }}" alt="Step {{ s.step }} image" />
+                {% else %}
+                    <div class="canvas-blank">blank</div>
+                {% endif %}
+            </div>
+            <figcaption>
+                <strong>Step {{ s.step }} · {{ s.player }}</strong>
+                <span class="prompt-quote">“{{ s.prompt }}”</span>
+            </figcaption>
+        </figure>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="card center">
+    <a class="btn primary" href="/leaderboard">See the leaderboard →</a>
+    <a class="btn" href="/">Play another group</a>
+</section>
+{% endblock %}

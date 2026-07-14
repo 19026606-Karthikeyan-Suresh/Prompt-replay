@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Prompt Relay — New Game{% endblock %}
+
+{% block content %}
+<section class="card hero">
+    <h1>Prompt Relay</h1>
+    <p class="lede">
+        A prompt-telephone party game. Your group has <strong>3 timed turns</strong> to
+        recreate a hidden reference image — but only <strong>Player 1</strong> ever sees it.
+        Every 30-second prompt edits the picture on screen. The AI judge scores your
+        final image against its <strong>10 secret details</strong>.
+    </p>
+
+    <form class="stack" action="/game" method="post">
+        <label class="field">
+            <span>Group name</span>
+            <input type="text" name="group_name" maxlength="60" required
+                   placeholder="e.g. The Rembrandts" autofocus />
+        </label>
+
+        <label class="field">
+            <span>Group size</span>
+            <select name="group_size">
+                <option value="3">3 players (one solo prompt each)</option>
+                <option value="4">4 players (2 solo, then players 3 &amp; 4 pair up)</option>
+            </select>
+        </label>
+
+        <button class="btn primary" type="submit">Start game →</button>
+    </form>
+</section>
+
+<section class="card how-to">
+    <h2>How it plays</h2>
+    <ol>
+        <li>Player 1 sees the reference for <strong>30 seconds</strong>, then it hides. They may coach the group out loud — but never show it.</li>
+        <li><strong>Step 1:</strong> Player 1 types a prompt → the AI generates the base image.</li>
+        <li><strong>Steps 2 &amp; 3:</strong> each next player edits the current image with a new prompt.</li>
+        <li>Timer hits 0 → whatever is typed is auto-submitted. Empty box = a forfeited turn.</li>
+        <li>Reveal: the reference, its 10 details, your relay, and your score out of 10.</li>
+    </ol>
+</section>
+{% endblock %}

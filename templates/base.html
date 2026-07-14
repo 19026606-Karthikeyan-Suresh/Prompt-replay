@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% block title %}Prompt Relay{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/styles.css" />
+    {# Per-page <head> extras (e.g. realtime script module tags) go here. #}
+    {% block head_extra %}{% endblock %}
+</head>
+<body>
+    <header class="site-header">
+        <a class="brand" href="/">🎨 Prompt Relay</a>
+        <nav><a href="/leaderboard">Leaderboard</a></nav>
+    </header>
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
