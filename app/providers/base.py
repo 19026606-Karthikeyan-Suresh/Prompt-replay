@@ -99,6 +99,57 @@ class JudgeResult:
         return cls(verdicts=verdicts, total=int(data.get("total", 0)))
 
 
+def parse_verdicts(data: dict, details: List[str]) -> List[DetailVerdict]:
+    """Map a judge's JSON payload back onto the ordered details list.
+
+    Real judges are asked to echo each detail, but we re-align defensively so the
+    result always has exactly one verdict per input detail, in the original order,
+    regardless of how the model ordered or spelled its echoes.
+
+    Args:
+        data: Parsed JSON, expected to contain a ``verdicts`` list of objects
+            with ``detail``/``present``/``reason`` keys.
+        details: The original ordered detail phrases.
+
+    Returns:
+        A list of :class:`DetailVerdict`, one per input detail.
+    """
+    # Index the model's verdicts by lowercased detail text for order-independent
+    # lookup; the model may reorder or re-case the echoed detail strings.
+    by_detail = {}
+    for item in data.get("verdicts", []) or []:
+        key = str(item.get("detail", "")).strip().lower()
+        by_detail[key] = item
+
+    verdicts: List[DetailVerdict] = []
+    for detail in details:
+        item = by_detail.get(detail.strip().lower(), {})
+        verdicts.append(
+            DetailVerdict(
+                detail=detail,
+                present=bool(item.get("present", False)),
+                reason=str(item.get("reason", "")) or "No reason provided.",
+            )
+        )
+    return verdicts
+
+
+def parse_similarity(data: dict) -> float:
+    """Convert a ``{"similarity": <value>}`` payload into a 0..1 float.
+
+    Accepts either a 0-100 rating or an already-0-1 value and clamps the result.
+
+    Args:
+        data: Parsed JSON expected to hold a numeric ``similarity`` field.
+
+    Returns:
+        The clamped similarity in ``[0.0, 1.0]``.
+    """
+    raw = float(data.get("similarity", 0))
+    value = raw / 100.0 if raw > 1 else raw
+    return max(0.0, min(1.0, value))
+
+
 class ImageProvider(ABC):
     """Abstract text-to-image and image-to-image backend."""
 
