@@ -1,0 +1,25 @@
+# Web framework + server
+fastapi
+uvicorn[standard]
+
+# Templating + form parsing (multipart is needed for FastAPI Form() inputs)
+jinja2
+python-multipart
+
+# Persistence: Supabase (Postgres rows + Storage + realtime)
+supabase
+
+# AI providers
+google-generativeai
+openai
+
+# Config + image handling
+python-dotenv
+pillow
+
+# --- Optional local CLIP similarity upgrade (uncomment to enable) ---
+# torch
+# open_clip_torch
+
+# --- Dev/test only ---
+pytest
