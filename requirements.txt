@@ -10,7 +10,7 @@ python-multipart
 supabase
 
 # AI providers
-google-generativeai
+google-genai
 openai
 
 # Config + image handling

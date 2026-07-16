@@ -130,7 +130,7 @@ def get_settings() -> Settings:
         openai_api_key=os.getenv("OPENAI_API_KEY", "").strip(),
         # Image + vision model ids — override via env if a provider renames them.
         gemini_image_model=os.getenv(
-            "GEMINI_IMAGE_MODEL", "gemini-2.0-flash-preview-image-generation"
+            "GEMINI_IMAGE_MODEL", "gemini-2.5-flash-image"
         ).strip(),
         gemini_vision_model=os.getenv("GEMINI_VISION_MODEL", "gemini-2.0-flash").strip(),
         openai_image_model=os.getenv("OPENAI_IMAGE_MODEL", "gpt-image-1").strip(),
