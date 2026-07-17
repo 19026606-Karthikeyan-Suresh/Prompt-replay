@@ -30,7 +30,10 @@ forfeited, the base stays blank and the next non-empty prompt generates it.
 
 - Python 3.11+
 - A Supabase project (Postgres + Storage + realtime)
-- Optionally, Gemini and/or OpenAI API keys (otherwise the mock provider is used)
+- An **OpenAI API key** (recommended — it's the working image/judge provider). A
+  Gemini key is optional and, for image generation, requires a billing-enabled
+  Google project (see [AI providers](#ai-providers)). With no keys at all, the
+  keyless mock provider runs the whole game.
 
 ## Setup
 
@@ -58,13 +61,18 @@ Copy `.env.example` to `.env` and fill in:
 
 - `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` (server-side only), `SUPABASE_ANON_KEY`
   (Project Settings → API).
-- `GEMINI_API_KEY` and/or `OPENAI_API_KEY` for real images. Leave both blank to
-  run on the keyless mock (`ENABLE_MOCK=true`).
+- `OPENAI_API_KEY` for real images/judging (recommended). `GEMINI_API_KEY` is
+  optional. Leave both blank to run on the keyless mock (`ENABLE_MOCK=true`).
+- `PROVIDER_ORDER` chooses which real providers are tried, in order. This project
+  ships as `PROVIDER_ORDER=openai` because Gemini image generation needs a paid
+  Google account (see [AI providers](#ai-providers)); switch to `gemini,openai`
+  once Gemini billing is enabled.
 
 ### 4. Seed the reference pool
 
-A small sample pool is committed under `references/`. To (re)generate references
-with the configured image AI and upload them to Storage:
+A sample pool of three real illustrations (generated with `gpt-image-1`) is
+committed under `references/`, each containing all 10 of its target details. To
+(re)generate references with the configured image AI and upload them to Storage:
 
 ```bash
 python scripts/prepare_reference.py --seed          # uses your AI keys, or the mock
@@ -86,22 +94,38 @@ python scripts/prepare_reference.py --id my-scene \
 uvicorn app.main:app --reload
 ```
 
-Open <http://localhost:8000>. Open the leaderboard on a second screen or phone at
-`/leaderboard` — it updates live as groups finish.
+Open <http://localhost:8000> (if port 8000 is unavailable — some Windows setups
+reserve it — start with `uvicorn app.main:app --reload --port 8137`). Open the
+leaderboard on a second screen or phone at `/leaderboard` — it updates live as
+groups finish.
 
 ## AI providers
 
-All providers are pluggable and use ordered **fallback**: the primary is tried
-first, and on any error/rate-limit/quota the next is tried automatically.
+All providers are pluggable and use ordered **fallback**: each provider named in
+`PROVIDER_ORDER` is tried in turn, and on any error/rate-limit/quota the next is
+tried automatically. The keyless mock is appended last when `ENABLE_MOCK=true`,
+so the app always has a working provider.
 
-- **Images** — `GeminiImageProvider` (primary) → `OpenAIImageProvider`
-  (`gpt-image-1`) → `MockImageProvider`.
-- **Judge + similarity** — Gemini → OpenAI → mock, same fallback.
-- Order is set by `PROVIDER_ORDER`; the mock is appended when `ENABLE_MOCK=true`.
-  Set `ENABLE_MOCK=false` to make an all-providers-failed step surface a clear,
+- **Images** — `OpenAIImageProvider` (`gpt-image-1`) and/or `GeminiImageProvider`
+  → `MockImageProvider`.
+- **Judge + similarity** — OpenAI (`gpt-4o-mini`) and/or Gemini → mock.
+- Gemini uses the current **`google-genai`** SDK (the older `google-generativeai`
+  package is end-of-life and can't do image `response_modalities`).
+- Model ids are env-overridable since providers rename models. Defaults:
+  image `gemini-2.5-flash-image` / `gpt-image-1`; vision `gemini-2.0-flash` /
+  `gpt-4o-mini`.
+- Set `ENABLE_MOCK=false` to make an all-providers-failed step surface a clear,
   retryable error instead of falling back to the mock.
-- Model ids are env-overridable (`GEMINI_IMAGE_MODEL`, etc.) since providers
-  rename models over time.
+
+### Gemini vs OpenAI
+
+This project ships with `PROVIDER_ORDER=openai`. Gemini **image generation is a
+paid feature**: on a free-tier (no-billing) Google project the API returns `429`
+with `limit: 0` for the image models, so image calls can never succeed there (and
+some text model ids are gated off for newer accounts). To use Gemini, enable
+**billing** on the Google Cloud project behind your `GEMINI_API_KEY`, then set
+`PROVIDER_ORDER=gemini,openai`. Until then OpenAI handles all image generation and
+judging — which is the configuration this project was verified end-to-end on.
 
 ## Tests
 
@@ -133,3 +157,8 @@ tests/          offline pytest suite
   (`.env` is git-ignored).
 - The FastAPI server is the only writer and uses the service-role key; the
   browser uses the anon key solely for read-only realtime leaderboard updates.
+- Committed references store `public_url: null`; the app uploads each reference to
+  the **current** project's Storage on first use, so the pool works against any
+  Supabase project.
+- Verified end-to-end against a live Supabase + OpenAI: game create → 3-step relay
+  → real image generation → AI judge → leaderboard row → live realtime update.
