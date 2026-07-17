@@ -72,6 +72,9 @@ class Settings:
         gemini_vision_model: Gemini model id used for judging/similarity.
         openai_image_model: OpenAI model id used for image generate/edit.
         openai_vision_model: OpenAI model id used for judging/similarity.
+        openai_image_quality: Image quality tier ("low"|"medium"|"high"|"auto").
+            Lower tiers generate far fewer image tokens, so they are both cheaper
+            AND faster; "low" is the cheapest/fastest.
         provider_order: Ordered provider names to try (e.g. ["gemini","openai"]).
         enable_mock: Whether to append the keyless mock as a final fallback.
         reference_reveal_seconds: Seconds player 1 sees the reference.
@@ -90,6 +93,8 @@ class Settings:
     gemini_vision_model: str
     openai_image_model: str
     openai_vision_model: str
+
+    openai_image_quality: str = "low"
 
     provider_order: List[str] = field(default_factory=list)
     enable_mock: bool = True
@@ -133,8 +138,10 @@ def get_settings() -> Settings:
             "GEMINI_IMAGE_MODEL", "gemini-2.5-flash-image"
         ).strip(),
         gemini_vision_model=os.getenv("GEMINI_VISION_MODEL", "gemini-2.0-flash").strip(),
-        openai_image_model=os.getenv("OPENAI_IMAGE_MODEL", "gpt-image-1").strip(),
+        # Default to the cheapest/fastest image model + quality; override via env.
+        openai_image_model=os.getenv("OPENAI_IMAGE_MODEL", "gpt-image-1-mini").strip(),
         openai_vision_model=os.getenv("OPENAI_VISION_MODEL", "gpt-4o-mini").strip(),
+        openai_image_quality=os.getenv("OPENAI_IMAGE_QUALITY", "low").strip().lower(),
         provider_order=provider_order,
         enable_mock=_get_bool("ENABLE_MOCK", True),
         reference_reveal_seconds=_get_int("REFERENCE_REVEAL_SECONDS", 30),
@@ -168,7 +175,13 @@ def build_image_provider() -> ImageProvider:
         elif name == "openai" and settings.openai_api_key:
             from .providers.openai import OpenAIImageProvider  # lazy import
 
-            chain.append(OpenAIImageProvider(settings.openai_api_key, settings.openai_image_model))
+            chain.append(
+                OpenAIImageProvider(
+                    settings.openai_api_key,
+                    settings.openai_image_model,
+                    settings.openai_image_quality,
+                )
+            )
 
     if settings.enable_mock:
         chain.append(MockImageProvider())

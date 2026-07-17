@@ -106,14 +106,18 @@ All providers are pluggable and use ordered **fallback**: each provider named in
 tried automatically. The keyless mock is appended last when `ENABLE_MOCK=true`,
 so the app always has a working provider.
 
-- **Images** — `OpenAIImageProvider` (`gpt-image-1`) and/or `GeminiImageProvider`
-  → `MockImageProvider`.
+- **Images** — `OpenAIImageProvider` (`gpt-image-1-mini`) and/or
+  `GeminiImageProvider` → `MockImageProvider`.
 - **Judge + similarity** — OpenAI (`gpt-4o-mini`) and/or Gemini → mock.
 - Gemini uses the current **`google-genai`** SDK (the older `google-generativeai`
   package is end-of-life and can't do image `response_modalities`).
 - Model ids are env-overridable since providers rename models. Defaults:
-  image `gemini-2.5-flash-image` / `gpt-image-1`; vision `gemini-2.0-flash` /
+  image `gemini-2.5-flash-image` / `gpt-image-1-mini`; vision `gemini-2.0-flash` /
   `gpt-4o-mini`.
+- **Cost/speed:** the OpenAI image model defaults to **`gpt-image-1-mini`** at
+  **`OPENAI_IMAGE_QUALITY=low`** — the cheapest and fastest combo (lower quality =
+  fewer image tokens = less generation time). Set `OPENAI_IMAGE_QUALITY=medium`
+  (or `OPENAI_IMAGE_MODEL=gpt-image-1`) for nicer images at more cost/time.
 - Set `ENABLE_MOCK=false` to make an all-providers-failed step surface a clear,
   retryable error instead of falling back to the mock.
 

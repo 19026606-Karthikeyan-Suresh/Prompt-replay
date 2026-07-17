@@ -45,17 +45,20 @@ class OpenAIImageProvider(ImageProvider):
 
     name = "openai-image"
 
-    def __init__(self, api_key: str, model: str) -> None:
-        """Create the OpenAI client and select the image model.
+    def __init__(self, api_key: str, model: str, quality: str = "auto") -> None:
+        """Create the OpenAI client and select the image model + quality.
 
         Args:
             api_key: The OpenAI API key.
-            model: The image model id (e.g. ``gpt-image-1``).
+            model: The image model id (e.g. ``gpt-image-1-mini``).
+            quality: Quality tier ("low"|"medium"|"high"|"auto"). Lower tiers
+                generate fewer image tokens, so they are cheaper and faster.
         """
         from openai import OpenAI  # lazy: only needed when configured
 
         self._client = OpenAI(api_key=api_key)
         self._model = model
+        self._quality = quality
 
     def generate(self, prompt: str) -> bytes:
         """Generate a base image from a text prompt.
@@ -71,7 +74,7 @@ class OpenAIImageProvider(ImageProvider):
         """
         try:
             result = self._client.images.generate(
-                model=self._model, prompt=prompt, size=_IMAGE_SIZE
+                model=self._model, prompt=prompt, size=_IMAGE_SIZE, quality=self._quality
             )
             return base64.b64decode(result.data[0].b64_json)
         except Exception as exc:
@@ -95,7 +98,8 @@ class OpenAIImageProvider(ImageProvider):
             buffer = io.BytesIO(image_bytes)
             buffer.name = "current.png"
             result = self._client.images.edit(
-                model=self._model, image=buffer, prompt=prompt, size=_IMAGE_SIZE
+                model=self._model, image=buffer, prompt=prompt, size=_IMAGE_SIZE,
+                quality=self._quality,
             )
             return base64.b64decode(result.data[0].b64_json)
         except Exception as exc:

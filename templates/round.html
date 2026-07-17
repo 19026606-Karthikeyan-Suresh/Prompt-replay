@@ -42,6 +42,18 @@
         </form>
     </div>
 </section>
+
+{# Requirement 1: full-screen "generating" animation shown during the (blocking)
+   submit. Hidden until submit; game.js reveals it and echoes the player's
+   prompt. It disappears on its own when the next round page loads. #}
+<div id="gen-overlay" class="gen-overlay" role="status" aria-live="polite" hidden>
+    <div class="gen-overlay__box">
+        <div class="gen-spinner" aria-hidden="true"></div>
+        <h2 class="gen-overlay__title">Generating your image…</h2>
+        <p class="gen-overlay__sub">Turning your prompt into a picture. Hang tight!</p>
+        <blockquote id="gen-prompt-echo" class="gen-overlay__prompt" hidden></blockquote>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
