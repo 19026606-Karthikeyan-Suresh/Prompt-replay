@@ -24,8 +24,8 @@ class FakeStore:
         self.images = {}         # url -> bytes
         self.leaderboard = []    # appended result rows
         # Reuse a real seeded reference so details + local image bytes exist.
-        self.reference = load_references()["rainy-street"]
-        self.reference.public_url = "mem://references/rainy-street.png"
+        self.reference = load_references()["beach-day"]
+        self.reference.public_url = "mem://references/beach-day.png"
 
     def assign_reference(self):
         """Return the fixed test reference (patched storage.assign_reference)."""
@@ -114,17 +114,17 @@ def test_full_relay_three_person(fake_store):
     gid = new_game["id"]
 
     # Step 1 generates the base image.
-    g1 = game.submit_prompt(gid, 1, "a red umbrella and a black cat")
+    g1 = game.submit_prompt(gid, 1, "a yellow beach umbrella and a red bucket")
     assert g1["current_step"] == 1
     assert g1["image_url_1"] is not None
 
     # Step 2 edits it.
-    g2 = game.submit_prompt(gid, 2, "add heavy rain and a yellow taxi")
+    g2 = game.submit_prompt(gid, 2, "add a blue starfish and a green surfboard")
     assert g2["image_url_2"] is not None
     assert g2["image_url_2"] != g2["image_url_1"]
 
     # Step 3 edits again and finalizes.
-    g3 = game.submit_prompt(gid, 3, "add a blue mailbox and a foggy grey sky")
+    g3 = game.submit_prompt(gid, 3, "add a striped beach ball and a bright orange sun")
     assert g3["finished"] is True
     assert 0 <= g3["detail_score"] <= 10
     assert g3["judge_result"]["total"] == g3["detail_score"]
@@ -135,8 +135,8 @@ def test_full_relay_three_person(fake_store):
 
     # Mock scoring should credit details our prompts mentioned.
     present = {v["detail"]: v["present"] for v in g3["judge_result"]["verdicts"]}
-    assert present["a red umbrella"] is True
-    assert present["a yellow taxi"] is True
+    assert present["a yellow beach umbrella"] is True
+    assert present["a green surfboard"] is True
 
 
 def test_empty_step1_defers_base_generation(fake_store):
@@ -150,11 +150,11 @@ def test_empty_step1_defers_base_generation(fake_store):
     assert g1["current_step"] == 1
 
     # Step 2 is the first real prompt -> generates the base image.
-    g2 = game.submit_prompt(gid, 2, "a silver rocket and a ringed planet")
+    g2 = game.submit_prompt(gid, 2, "a green surfboard and a red bucket")
     assert g2["image_url_2"] is not None
 
     # Step 3 edits and finishes.
-    g3 = game.submit_prompt(gid, 3, "add three small moons")
+    g3 = game.submit_prompt(gid, 3, "add a white seagull")
     assert g3["finished"] is True
     assert len(fake_store.leaderboard) == 1
 

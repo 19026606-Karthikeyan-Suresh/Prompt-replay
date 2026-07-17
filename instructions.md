@@ -1,14 +1,14 @@
 # Prompt Relay
 
-A "prompt telephone" party game. A group tries to recreate a hidden **reference image** — defined by exactly **10 details** — by writing a chain of 30-second prompts. Each prompt edits the evolving image on screen. Only the first player ever sees the reference, so information is carried forward by memory, coaching, and the image itself. The final image is scored by how many of the 10 details survived.
+A **prompting-skill** relay party game. A group recreates a **target image** — defined by exactly **10 details** — by writing a chain of 30-second prompts. The first prompt generates a base image and each later prompt edits the evolving image on screen. The **target stays visible the whole game**, so the challenge is how well the group can *prompt* an AI to reproduce what they see — not how well they memorised it. The final image is scored by how many of the 10 details survived.
 
 ## Overview
 
 - Players work in **groups of 3–4**.
-- Each group is assigned one pre-made reference image built from a fixed set of **10 details**.
-- Only **player 1** sees the reference, and only for **30 seconds** at the very start. After that it is hidden until the end.
+- Each group is assigned one pre-made target image built from a fixed set of **10 details**.
+- The **target is shown on every step**, so the whole group can prompt toward what they see.
 - The group takes **3 turns** ("steps"). On each turn one member (or a pair) has **30 seconds** to type a prompt; when the timer hits 0 the prompt is auto-submitted and the AI updates the image.
-- At the end, the reference and its 10 details are revealed and an AI judge scores the final image out of 10.
+- At the end, the target and its 10 details are shown alongside the relay and an AI judge scores the final image out of 10.
 - One group plays at a time; results go on a shared **leaderboard**.
 
 ## Setup & content preparation (done before the event)
@@ -19,20 +19,18 @@ A "prompt telephone" party game. A group tries to recreate a hidden **reference 
 
 ## How to play (game flow)
 
-1. **Group name** is entered → a new game session is created and a reference is assigned.
-2. **Reference reveal (player 1 only):** the reference image is shown to player 1 for **30 seconds** with a visible countdown, then hidden for the rest of the game. During and after the reveal, player 1 may **verbally coach** teammates on what the target should contain (teammates never see the reference themselves).
-3. **Step 1 — player 1:** a blank canvas is shown. Player 1 has **30 seconds** to type a prompt describing the target image. On timeout the prompt is auto-submitted and the AI **generates the base image** from it (text-to-image).
-4. **Step 2 — player 2:** the image from step 1 is shown. Player 2 has **30 seconds** to type a prompt describing what to add/change. On timeout the AI **edits the current image** with that prompt (image-to-image).
-5. **Step 3 — player 3 (or players 3 + 4 together):** the image from step 2 is shown, edited the same way into the **final image**.
-6. There are always **3 steps total**:
+1. **Group name** is entered → a new game session is created, a target is assigned, and play jumps straight into Step 1.
+2. **Step 1 — player 1:** the target is shown beside a blank canvas. Player 1 has **30 seconds** to type a prompt describing the target. On timeout the prompt is auto-submitted and the AI **generates the base image** from it (text-to-image).
+3. **Step 2 — player 2:** the target and the image from step 1 are shown. Player 2 has **30 seconds** to type a prompt describing what to add/change. On timeout the AI **edits the current image** with that prompt (image-to-image).
+4. **Step 3 — player 3 (or players 3 + 4 together):** the target and the image from step 2 are shown, edited the same way into the **final image**.
+5. There are always **3 steps total**:
    - **3-person group:** each member does one solo step.
    - **4-person group:** two members do solo steps and the remaining two **pair up** to write one prompt together within the same 30 seconds.
 
-> Each player describes the **current on-screen image** (what to build or change next), never the original reference — only player 1 ever saw that.
+> The **target stays on screen** the whole game. On steps 2–3 each player describes what to **add or change** on the current image to move it closer to the target — they don't restart it from scratch.
 
 ## Timing rules
 
-- Reference reveal: **30 seconds** (player 1 only).
 - Each prompt: **30 seconds**, hard cap. A visible countdown drives the UI and **auto-submits** whatever is in the box when it reaches 0.
 - **Empty prompt at timeout:** the current image is kept unchanged and that step is forfeited (a wasted turn). If step 1 is empty, the base image stays blank and the next non-empty prompt generates the base image instead of editing.
 
@@ -88,7 +86,7 @@ prompt-relay/
       gemini.py
       openai.py
       fallback.py
-  templates/             # index, reference, round, reveal, leaderboard
+  templates/             # index, round, reveal, leaderboard
   static/                # css + js/timer.js, js/game.js, js/leaderboard.js (realtime)
   references/            # source reference images + details.json (uploaded to Storage)
   scripts/prepare_reference.py
@@ -101,11 +99,10 @@ prompt-relay/
 ## Screens / routes
 
 - `GET /` — group name entry.
-- `POST /game` — create game, assign a reference → redirect to reference reveal.
-- `GET /game/{id}/reference` — 30s reference reveal (player 1), auto-advances to step 1.
-- `GET /game/{id}/round/{n}` — canvas + 30s timer + prompt input.
+- `POST /game` — create game, assign a target → redirect straight to step 1.
+- `GET /game/{id}/round/{n}` — target + current image + 30s timer + prompt input.
 - `POST /game/{id}/round/{n}` — submit prompt → generate/edit image → next step or reveal.
-- `GET /game/{id}/reveal` — reference + 10 details + relay progression + detail score.
+- `GET /game/{id}/reveal` — target + 10 details + relay progression + detail score.
 - `GET /leaderboard` — ranked results; the page subscribes to Supabase realtime for live updates.
 - Reference and generated images are uploaded to the **Supabase Storage** bucket; pages reference their public URLs.
 - `scripts/prepare_reference.py` — offline reference-image creation from 10 details.

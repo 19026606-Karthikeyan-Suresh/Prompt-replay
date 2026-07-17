@@ -62,14 +62,14 @@ def index(request: Request) -> HTMLResponse:
 
 @app.post("/game")
 def create_game(group_name: str = Form(...), group_size: int = Form(3)):
-    """Create a game, assign a reference, and redirect to the reference reveal.
+    """Create a game, assign a reference, and redirect straight to step 1.
 
     Args:
         group_name: The group's chosen name (from the form).
         group_size: Number of players, 3 or 4 (from the form).
 
     Returns:
-        A redirect to the reference reveal screen, or an error page if Supabase
+        A redirect to the step 1 round screen, or an error page if Supabase
         or the reference pool is not ready.
     """
     try:
@@ -77,39 +77,9 @@ def create_game(group_name: str = Form(...), group_size: int = Form(3)):
     except (StorageNotConfigured, RuntimeError) as exc:
         # Rendered without a Request-bound template here would fail; build inline.
         return HTMLResponse(f"<h1>Setup incomplete</h1><p>{exc}</p>", status_code=500)
-    return RedirectResponse(url=f"/game/{new_game['id']}/reference", status_code=303)
-
-
-@app.get("/game/{game_id}/reference", response_class=HTMLResponse)
-def reference_reveal(request: Request, game_id: str) -> HTMLResponse:
-    """Show the reference to player 1 for a fixed countdown, then auto-advance.
-
-    Args:
-        request: The incoming request.
-        game_id: The game's id.
-
-    Returns:
-        The reference reveal page, or an error page if the game is missing.
-    """
-    current = storage.get_game(game_id)
-    if current is None:
-        return _error_page(request, "That game was not found.", "/", status_code=404)
-
-    reference = storage.get_reference(current["reference_id"])
-    # Re-ensure the image is uploaded in case the server restarted since creation.
-    image_url = storage.ensure_reference_uploaded(reference)
-    settings = get_settings()
-    return templates.TemplateResponse(
-        request,
-        "reference.html",
-        {
-            "game": current,
-            "reference_image_url": image_url,
-            "details": reference.details,
-            "seconds": settings.reference_reveal_seconds,
-            "next_url": f"/game/{game_id}/round/1",
-        },
-    )
+    # The target stays on screen every round now, so there is no separate
+    # "memorise the reference" reveal — jump straight into Step 1.
+    return RedirectResponse(url=f"/game/{new_game['id']}/round/1", status_code=303)
 
 
 @app.get("/game/{game_id}/round/{n}", response_class=HTMLResponse)
@@ -137,6 +107,12 @@ def round_screen(request: Request, game_id: str, n: int) -> HTMLResponse:
     if n != expected:
         return RedirectResponse(url=f"/game/{game_id}/round/{expected}", status_code=303)
 
+    # The reference (target) is shown on every round so this is a prompting test,
+    # not a memory test. Loading it here is cheap: the pool is lru_cached and the
+    # public URL is cached on the Reference after the first upload.
+    reference = storage.get_reference(current["reference_id"])
+    reference_image_url = storage.ensure_reference_uploaded(reference)
+
     settings = get_settings()
     return templates.TemplateResponse(
         request,
@@ -146,6 +122,7 @@ def round_screen(request: Request, game_id: str, n: int) -> HTMLResponse:
             "step": n,
             "total_steps": game.TOTAL_STEPS,
             "player": game.player_label(current["group_size"], n),
+            "reference_image_url": reference_image_url,
             "current_image_url": game.latest_image_url(current),
             "seconds": settings.prompt_seconds,
             "post_url": f"/game/{game_id}/round/{n}",

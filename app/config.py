@@ -77,7 +77,6 @@ class Settings:
             AND faster; "low" is the cheapest/fastest.
         provider_order: Ordered provider names to try (e.g. ["gemini","openai"]).
         enable_mock: Whether to append the keyless mock as a final fallback.
-        reference_reveal_seconds: Seconds player 1 sees the reference.
         prompt_seconds: Seconds allowed per prompt before auto-submit.
     """
 
@@ -98,7 +97,6 @@ class Settings:
 
     provider_order: List[str] = field(default_factory=list)
     enable_mock: bool = True
-    reference_reveal_seconds: int = 30
     prompt_seconds: int = 30
 
     @property
@@ -144,7 +142,6 @@ def get_settings() -> Settings:
         openai_image_quality=os.getenv("OPENAI_IMAGE_QUALITY", "low").strip().lower(),
         provider_order=provider_order,
         enable_mock=_get_bool("ENABLE_MOCK", True),
-        reference_reveal_seconds=_get_int("REFERENCE_REVEAL_SECONDS", 30),
         prompt_seconds=_get_int("PROMPT_SECONDS", 30),
     )
 

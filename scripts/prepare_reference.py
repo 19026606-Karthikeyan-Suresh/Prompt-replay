@@ -10,8 +10,8 @@ Usage:
     python scripts/prepare_reference.py --seed
 
     # Create one reference from explicit details:
-    python scripts/prepare_reference.py --id rainy-street \\
-        --details "a red umbrella" "a black cat" ... (exactly 10)
+    python scripts/prepare_reference.py --id beach-day \\
+        --details "a yellow beach umbrella" "a red bucket" ... (exactly 10)
 
     # Create from a JSON file: {"id": "...", "details": ["...", ... 10]}
     python scripts/prepare_reference.py --from-json my_ref.json
@@ -43,29 +43,47 @@ _REFERENCES_DIR = os.path.join(_PROJECT_ROOT, "references")
 # gives the app a playable pool out of the box.
 SEED_REFERENCES = [
     {
-        "id": "rainy-street",
+        "id": "beach-day",
         "details": [
-            "a red umbrella", "a black cat", "heavy rain", "a yellow taxi",
-            "a glowing streetlamp", "a puddle reflection", "a blue mailbox",
-            "a person in a raincoat", "wet cobblestones", "a foggy grey sky",
+            "a yellow beach umbrella", "a red bucket", "a blue starfish",
+            "a green surfboard", "a white seagull", "a striped beach ball",
+            "a sandcastle with a flag", "a pink flip-flop",
+            "a coconut drink with a straw", "a bright orange sun",
         ],
     },
     {
-        "id": "sunny-picnic",
+        "id": "cozy-cafe",
         "details": [
-            "a checkered picnic blanket", "a wicker basket", "a green apple",
-            "two red balloons", "a golden retriever", "a wooden guitar",
-            "a glass lemonade jug", "an orange butterfly", "a tall oak tree",
-            "a kite in the sky",
+            "a steaming coffee cup", "a slice of chocolate cake", "a brown teapot",
+            "a small green cactus", "a hanging pendant lamp", "a stack of three books",
+            "a black cat on a chair", "a chalkboard menu", "a vase of red tulips",
+            "a checkered floor",
         ],
     },
     {
-        "id": "space-scene",
+        "id": "winter-cabin",
         "details": [
-            "a silver rocket", "a ringed planet", "three small moons",
-            "a floating astronaut", "a bright yellow star", "a red robot",
-            "a glass dome habitat", "a trail of stardust", "a blue nebula",
-            "a green alien plant",
+            "a wooden log cabin", "a red front door", "a snowman with a carrot nose",
+            "a green pine tree", "a puff of chimney smoke", "a pair of skis",
+            "a glowing lantern", "a red sled", "a robin on a branch",
+            "a starry night sky",
+        ],
+    },
+    {
+        "id": "farm-morning",
+        "details": [
+            "a red barn", "a white picket fence", "a brown horse", "a yellow chick",
+            "a green tractor", "a scarecrow with a straw hat", "a stack of hay bales",
+            "a red rooster", "a wooden windmill", "a bright blue sky",
+        ],
+    },
+    {
+        "id": "underwater-reef",
+        "details": [
+            "an orange clownfish", "a purple octopus", "a green sea turtle",
+            "a pink coral reef", "a wooden treasure chest", "a yellow submarine",
+            "a school of blue fish", "a red crab", "a tall strand of seaweed",
+            "a stream of bubbles",
         ],
     },
 ]

@@ -136,9 +136,13 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent-2); 
 }
 .canvas-blank span { font-weight: 400; font-size: 0.85rem; }
 
-/* Round layout */
-.round-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; align-items: start; margin-top: 12px; }
-.prompt-form { margin: 0; }
+/* Round layout — target + current image side by side, prompt form below.
+   .round-canvases reuses .compare-grid (2 cols, collapses on mobile). */
+.round-canvases { margin-top: 12px; }
+.canvas-panel { margin: 0; }
+.canvas-panel figcaption { text-align: center; color: var(--ink-muted); margin-top: 8px; }
+.canvas-panel:first-child figcaption { color: var(--accent-2); font-weight: 700; }
+.prompt-form { margin: 18px 0 0; }
 
 /* Requirement 1: "generating" overlay shown while the image is being made. */
 .gen-overlay {
@@ -187,11 +191,6 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent-2); 
 }
 @keyframes gen-spin { to { transform: rotate(360deg); } }
 @keyframes gen-fade { from { opacity: 0; } to { opacity: 1; } }
-
-/* Reference reveal */
-.reveal-card .canvas-frame { max-width: 460px; margin: 16px auto; }
-.details-hint { margin-top: 10px; }
-.detail-list { columns: 2; gap: 20px; }
 
 /* Reveal / results */
 .score-row { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 12px; }
@@ -256,9 +255,8 @@ table.leaderboard tbody tr:hover { background: var(--bg-soft-2); }
 
 /* Responsive */
 @media (max-width: 720px) {
-    .round-grid, .compare-grid { grid-template-columns: 1fr; }
+    .compare-grid { grid-template-columns: 1fr; }
     .relay-grid { grid-template-columns: 1fr; }
-    .detail-list { columns: 1; }
     h1 { font-size: 1.6rem; }
     .timer.big { font-size: 1.8rem; }
 }

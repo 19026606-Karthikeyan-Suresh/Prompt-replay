@@ -14,33 +14,43 @@
 
     <p class="lede">
         {% if step == 1 %}
-            Describe the target image from scratch — this prompt <strong>generates</strong> the base picture.
+            Describe the <strong>target</strong> on the left — this prompt <strong>generates</strong> your base picture.
         {% else %}
-            Describe what to <strong>add or change</strong> on the current image below. Don't restart it.
+            Describe what to <strong>add or change</strong> on <em>your current image</em> (right) to move it
+            closer to the <strong>target</strong> (left). Don't restart it from scratch.
         {% endif %}
-        Describe the <strong>picture on screen</strong>, never the original reference.
+        The target stays on screen the whole game — this is a prompting challenge, not a memory test.
     </p>
 
-    <div class="round-grid">
-        <div class="canvas-frame">
-            {% if current_image_url %}
-                <img class="canvas-img" src="{{ current_image_url }}" alt="Current image" />
-            {% else %}
-                <div class="canvas-blank">Blank canvas<br /><span>Step 1 creates the base image</span></div>
-            {% endif %}
-        </div>
-
-        <form id="prompt-form" class="stack prompt-form" action="{{ post_url }}" method="post">
-            <label class="field">
-                <span>Your 30-second prompt</span>
-                <textarea id="prompt" name="prompt" rows="6" maxlength="500"
-                          placeholder="e.g. add a red umbrella and a black cat in the rain"
-                          autofocus></textarea>
-            </label>
-            <button class="btn primary" type="submit">Submit now →</button>
-            <p class="muted">Auto-submits when the timer reaches 0. An empty box forfeits this turn.</p>
-        </form>
+    <div class="round-canvases compare-grid">
+        <figure class="canvas-panel">
+            <div class="canvas-frame">
+                <img class="canvas-img" src="{{ reference_image_url }}" alt="Target image to recreate" />
+            </div>
+            <figcaption>🎯 Target — recreate this</figcaption>
+        </figure>
+        <figure class="canvas-panel">
+            <div class="canvas-frame">
+                {% if current_image_url %}
+                    <img class="canvas-img" src="{{ current_image_url }}" alt="Your current image" />
+                {% else %}
+                    <div class="canvas-blank">Blank canvas<br /><span>Step 1 creates the base image</span></div>
+                {% endif %}
+            </div>
+            <figcaption>Your current image</figcaption>
+        </figure>
     </div>
+
+    <form id="prompt-form" class="stack prompt-form" action="{{ post_url }}" method="post">
+        <label class="field">
+            <span>Your 30-second prompt</span>
+            <textarea id="prompt" name="prompt" rows="6" maxlength="500"
+                      placeholder="e.g. add a red umbrella and a black cat in the rain"
+                      autofocus></textarea>
+        </label>
+        <button class="btn primary" type="submit">Submit now →</button>
+        <p class="muted">Auto-submits when the timer reaches 0. An empty box forfeits this turn.</p>
+    </form>
 </section>
 
 {# Requirement 1: full-screen "generating" animation shown during the (blocking)
