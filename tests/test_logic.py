@@ -20,10 +20,10 @@ def test_generate_when_blank():
     assert game.decide_action(blank, "a red umbrella") == game.ACTION_GENERATE
 
 
-def test_edit_when_base_exists():
-    """A non-empty prompt with an existing image should edit it."""
+def test_regenerate_when_base_exists():
+    """Broken telephone: a non-empty prompt regenerates even if a base exists."""
     after1 = {"image_url_1": "u1", "image_url_2": None, "image_url_3": None}
-    assert game.decide_action(after1, "add a cat") == game.ACTION_EDIT
+    assert game.decide_action(after1, "a cat on a mat") == game.ACTION_GENERATE
 
 
 def test_empty_prompt_carries():

@@ -1,12 +1,13 @@
 # Prompt Relay
 
-A **prompting-skill** relay party game. A group of 3–4 recreates a **target
-image** — defined by exactly **10 details** — by writing a chain of three
-30-second prompts. The first prompt generates a base image (text-to-image); the
-next two edit it (image-to-image). The target stays **on screen the whole game**,
-so it tests how well you can *prompt* an AI to reproduce what you see — not how
-well you memorised it. At the end an AI vision judge scores the final image out of
-10, similarity breaks ties, and results land on a **live leaderboard**.
+A **broken-telephone** prompting party game. A group of 3–4 passes a **target
+image** — defined by exactly **10 details** — down a chain of three 30-second
+prompts. **Only Player 1 sees the target**; they describe it and the AI draws a
+picture. Each later player sees **only the image the player before them made**,
+describes what they see, and the AI **redraws it from scratch** — so the picture
+drifts from the original like real broken telephone. At the end an AI vision judge
+scores the final image out of 10, similarity breaks ties, and results land on a
+**live leaderboard**.
 
 > Built with FastAPI + Jinja2 (no build step), Supabase (Postgres + Storage +
 > realtime), and pluggable Gemini/OpenAI image + judge providers with automatic
@@ -17,13 +18,14 @@ well you memorised it. At the end an AI vision judge scores the final image out 
 
 1. **Group name + size** entered → a game is created and a target assigned, then
    play jumps straight into Step 1.
-2. **Step 1** (Player 1): 30s prompt → AI **generates** the base image.
-3. **Step 2** (Player 2): 30s prompt → AI **edits** the current image.
-4. **Step 3** (Player 3, or Players 3 & 4 paired in a 4-person group): final edit.
-
-   Every step shows the **target** alongside the group's current image, so players
-   prompt toward what they can see the whole time.
-5. **Reveal**: the target, the 10 details, the full relay, and the score out of 10.
+2. **Step 1** (Player 1): sees the **target** and has 30s to describe it → AI
+   **draws** the base image.
+3. **Step 2** (Player 2): sees **only Player 1's image** (not the target), describes
+   it in 30s → AI **redraws** a fresh image from that description.
+4. **Step 3** (Player 3, or Players 3 & 4 paired in a 4-person group): sees **only
+   Player 2's image**, describes it → AI redraws the final image.
+5. **Reveal**: the target, the 10 details, the full relay, and the score out of 10 —
+   the first time anyone but Player 1 sees the original.
 6. Result is appended to the **leaderboard** (ranked by detail score, then similarity).
 
 Empty box at timeout = a forfeited turn (image kept unchanged). If Step 1 is
@@ -142,7 +144,7 @@ Logic tests run fully offline (no Supabase, no AI keys — they use the mock):
 python -m pytest
 ```
 
-They cover the game state machine (generate/edit/forfeit rules, player labels),
+They cover the game state machine (regenerate/forfeit rules, player labels),
 the provider fallback chain, the mock provider/judge, scoring, and a full
 in-memory end-to-end relay.
 

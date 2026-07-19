@@ -107,14 +107,17 @@ def round_screen(request: Request, game_id: str, n: int) -> HTMLResponse:
     if n != expected:
         return RedirectResponse(url=f"/game/{game_id}/round/{expected}", status_code=303)
 
-    # The reference (target) is shown on every round so this is a prompting test,
-    # not a memory test. Loading it here is cheap: the pool is lru_cached and the
-    # public URL is cached on the Reference after the first upload.
-    reference = storage.get_reference(current["reference_id"])
-    reference_image_url = storage.ensure_reference_uploaded(reference)
+    # Broken-telephone visibility: only Player 1 (step 1) sees the target. Later
+    # players see just the previous player's image, so the target URL must never
+    # reach their page at all — only load/pass it on step 1. (Cheap on step 1: the
+    # pool is lru_cached and the public URL is cached after the first upload.)
+    reference_image_url = None
+    if n == 1:
+        reference = storage.get_reference(current["reference_id"])
+        reference_image_url = storage.ensure_reference_uploaded(reference)
 
     settings = get_settings()
-    return templates.TemplateResponse(
+    response = templates.TemplateResponse(
         request,
         "round.html",
         {
@@ -128,11 +131,15 @@ def round_screen(request: Request, game_id: str, n: int) -> HTMLResponse:
             "post_url": f"/game/{game_id}/round/{n}",
         },
     )
+    # Prevent the browser back button from resurfacing a prior step (e.g. Player 1's
+    # target) from the bfcache after the device is passed to the next player.
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @app.post("/game/{game_id}/round/{n}")
 def submit_round(request: Request, game_id: str, n: int, prompt: str = Form("")):
-    """Apply a step's prompt (generate/edit/carry) and advance the relay.
+    """Apply a step's prompt (generate/carry) and advance the relay.
 
     Args:
         request: The incoming request.

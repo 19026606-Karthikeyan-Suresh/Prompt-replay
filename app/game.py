@@ -1,4 +1,4 @@
-"""Game state machine: step ordering, the generate-vs-edit rule, and I/O glue.
+"""Game state machine: step ordering, the regenerate-every-turn rule, and I/O glue.
 
 The pure decision helpers at the top (``latest_image_url``, ``decide_action``,
 ``player_label`` …) contain the actual game rules and take/return plain data, so
@@ -17,10 +17,11 @@ from .config import build_image_provider
 # A relay is always exactly three steps (spec: "There are always 3 steps total").
 TOTAL_STEPS = 3
 
-# Action names returned by decide_action.
-ACTION_GENERATE = "generate"  # text-to-image: create the base image
-ACTION_EDIT = "edit"          # image-to-image: edit the current image
-ACTION_CARRY = "carry"        # empty prompt: keep the current image unchanged
+# Action names returned by decide_action. Every non-empty prompt regenerates a
+# fresh image (broken-telephone: each player re-describes what they see and the
+# AI redraws from scratch), so there is no image-to-image "edit" action.
+ACTION_GENERATE = "generate"  # text-to-image: draw a fresh image from the prompt
+ACTION_CARRY = "carry"        # empty prompt: keep the previous image unchanged
 
 
 # --------------------------------------------------------------------------- #
@@ -47,24 +48,26 @@ def latest_image_url(game: dict) -> Optional[str]:
 
 
 def decide_action(game: dict, prompt: str) -> str:
-    """Decide whether the incoming prompt generates, edits, or is a no-op.
+    """Decide whether the incoming prompt draws a fresh image or is a no-op.
 
-    Encodes the spec's rules:
-      * Empty prompt -> carry the current image forward (step forfeited).
-      * Non-empty prompt with no base image yet -> generate (text-to-image).
-      * Non-empty prompt with a base image present -> edit (image-to-image).
+    Broken-telephone rule: every non-empty prompt regenerates a brand-new image
+    from the player's description (text-to-image) — the previous image is only
+    shown for the player to describe, never carried forward as pixels. An empty
+    prompt forfeits the turn and keeps the previous image.
+
+      * Empty/whitespace prompt -> carry the previous image forward (forfeit).
+      * Any non-empty prompt     -> generate a fresh image (text-to-image).
 
     Args:
         game: The current game row dict.
         prompt: The submitted prompt text (possibly empty/whitespace).
 
     Returns:
-        One of :data:`ACTION_GENERATE`, :data:`ACTION_EDIT`, :data:`ACTION_CARRY`.
+        :data:`ACTION_GENERATE` for a non-empty prompt, else :data:`ACTION_CARRY`.
     """
     if not prompt or not prompt.strip():
         return ACTION_CARRY
-    # A base image exists once any prior step produced one.
-    return ACTION_EDIT if latest_image_url(game) else ACTION_GENERATE
+    return ACTION_GENERATE
 
 
 def player_label(group_size: int, step: int) -> str:
@@ -144,17 +147,13 @@ def submit_prompt(game_id: str, step: int, prompt: str) -> dict:
         return game
 
     action = decide_action(game, prompt)
-    provider = build_image_provider()
 
     if action == ACTION_GENERATE:
+        # Redraw a fresh image from this player's description of what they saw.
+        provider = build_image_provider()
         image_bytes = provider.generate(prompt.strip())
         new_url = storage.upload_generated_image(game_id, step, image_bytes)
-    elif action == ACTION_EDIT:
-        # Fetch the current on-screen image and edit it into the next one.
-        current_bytes = storage.fetch_image_bytes(latest_image_url(game))
-        image_bytes = provider.edit(current_bytes, prompt.strip())
-        new_url = storage.upload_generated_image(game_id, step, image_bytes)
-    else:  # ACTION_CARRY — empty prompt: keep the current image (possibly None)
+    else:  # ACTION_CARRY — empty prompt: keep the previous image (possibly None)
         new_url = latest_image_url(game)
 
     # Record this step's prompt + resulting image and advance the pointer.

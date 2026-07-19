@@ -109,22 +109,22 @@ def fake_store(monkeypatch):
 
 
 def test_full_relay_three_person(fake_store):
-    """A full 3-step relay generates, edits twice, scores, and posts a result."""
+    """A full 3-step relay redraws each turn, scores, and posts a result."""
     new_game = game.create_new_game("Test Crew", 3)
     gid = new_game["id"]
 
-    # Step 1 generates the base image.
+    # Step 1 draws the base image from Player 1's description of the target.
     g1 = game.submit_prompt(gid, 1, "a yellow beach umbrella and a red bucket")
     assert g1["current_step"] == 1
     assert g1["image_url_1"] is not None
 
-    # Step 2 edits it.
-    g2 = game.submit_prompt(gid, 2, "add a blue starfish and a green surfboard")
+    # Step 2 redraws a fresh image from the next player's description.
+    g2 = game.submit_prompt(gid, 2, "a blue starfish and a green surfboard")
     assert g2["image_url_2"] is not None
     assert g2["image_url_2"] != g2["image_url_1"]
 
-    # Step 3 edits again and finalizes.
-    g3 = game.submit_prompt(gid, 3, "add a striped beach ball and a bright orange sun")
+    # Step 3 redraws again and finalizes.
+    g3 = game.submit_prompt(gid, 3, "a striped beach ball and a bright orange sun")
     assert g3["finished"] is True
     assert 0 <= g3["detail_score"] <= 10
     assert g3["judge_result"]["total"] == g3["detail_score"]
@@ -133,10 +133,12 @@ def test_full_relay_three_person(fake_store):
     assert len(fake_store.leaderboard) == 1
     assert fake_store.leaderboard[0]["group_name"] == "Test Crew"
 
-    # Mock scoring should credit details our prompts mentioned.
+    # Broken telephone: the final image is redrawn from ONLY the last player's
+    # prompt, so mock scoring credits step-3 details and drops earlier ones.
     present = {v["detail"]: v["present"] for v in g3["judge_result"]["verdicts"]}
-    assert present["a yellow beach umbrella"] is True
-    assert present["a green surfboard"] is True
+    assert present["a striped beach ball"] is True   # named in step 3
+    assert present["a bright orange sun"] is True     # named in step 3
+    assert present["a green surfboard"] is False      # named only in step 2 — lost
 
 
 def test_empty_step1_defers_base_generation(fake_store):

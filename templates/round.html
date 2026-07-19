@@ -14,30 +14,29 @@
 
     <p class="lede">
         {% if step == 1 %}
-            Describe the <strong>target</strong> on the left — this prompt <strong>generates</strong> your base picture.
+            You're first. Describe the <strong>target picture</strong> below so the AI draws your team's
+            base image. The players after you <strong>won't see the target</strong> — only the picture you make.
         {% else %}
-            Describe what to <strong>add or change</strong> on <em>your current image</em> (right) to move it
-            closer to the <strong>target</strong> (left). Don't restart it from scratch.
+            Only you can see this image — it's what the player before you made. Describe
+            <strong>what you see</strong> as clearly as you can; the AI will <strong>redraw it</strong> from
+            your words. You can't see the original target — it's broken telephone!
         {% endif %}
-        The target stays on screen the whole game — this is a prompting challenge, not a memory test.
     </p>
 
-    <div class="round-canvases compare-grid">
+    <div class="round-single">
         <figure class="canvas-panel">
             <div class="canvas-frame">
-                <img class="canvas-img" src="{{ reference_image_url }}" alt="Target image to recreate" />
-            </div>
-            <figcaption>🎯 Target — recreate this</figcaption>
-        </figure>
-        <figure class="canvas-panel">
-            <div class="canvas-frame">
-                {% if current_image_url %}
-                    <img class="canvas-img" src="{{ current_image_url }}" alt="Your current image" />
+                {% if step == 1 %}
+                    <img class="canvas-img" src="{{ reference_image_url }}" alt="Target picture to describe" />
+                {% elif current_image_url %}
+                    <img class="canvas-img" src="{{ current_image_url }}" alt="Image passed to you" />
                 {% else %}
-                    <div class="canvas-blank">Blank canvas<br /><span>Step 1 creates the base image</span></div>
+                    <div class="canvas-blank">No image yet<br /><span>The previous turn was forfeited — your prompt starts the picture</span></div>
                 {% endif %}
             </div>
-            <figcaption>Your current image</figcaption>
+            <figcaption>
+                {% if step == 1 %}🎯 The target — describe it{% else %}🖼️ Passed to you — describe what you see{% endif %}
+            </figcaption>
         </figure>
     </div>
 
@@ -45,7 +44,7 @@
         <label class="field">
             <span>Your 30-second prompt</span>
             <textarea id="prompt" name="prompt" rows="6" maxlength="500"
-                      placeholder="e.g. add a red umbrella and a black cat in the rain"
+                      placeholder="e.g. a red umbrella and a black cat on a rainy street"
                       autofocus></textarea>
         </label>
         <button class="btn primary" type="submit">Submit now →</button>

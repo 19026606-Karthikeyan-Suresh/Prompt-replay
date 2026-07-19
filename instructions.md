@@ -1,13 +1,13 @@
 # Prompt Relay
 
-A **prompting-skill** relay party game. A group recreates a **target image** — defined by exactly **10 details** — by writing a chain of 30-second prompts. The first prompt generates a base image and each later prompt edits the evolving image on screen. The **target stays visible the whole game**, so the challenge is how well the group can *prompt* an AI to reproduce what they see — not how well they memorised it. The final image is scored by how many of the 10 details survived.
+A **broken-telephone** prompting party game. A group passes a **target image** — defined by exactly **10 details** — down a chain of 30-second prompts. **Only player 1 sees the target**; they describe it and the AI draws a picture. Each later player sees **only the image the player before them made**, describes what they see, and the AI **redraws it from scratch** — so the picture drifts from the original like real broken telephone. The final image is scored by how many of the 10 details survived.
 
 ## Overview
 
 - Players work in **groups of 3–4**.
 - Each group is assigned one pre-made target image built from a fixed set of **10 details**.
-- The **target is shown on every step**, so the whole group can prompt toward what they see.
-- The group takes **3 turns** ("steps"). On each turn one member (or a pair) has **30 seconds** to type a prompt; when the timer hits 0 the prompt is auto-submitted and the AI updates the image.
+- **Only player 1 sees the target.** Every later player sees only the image the previous player produced — not the target — and describes it so the AI redraws it.
+- The group takes **3 turns** ("steps"). On each turn one member (or a pair) has **30 seconds** to type a prompt; when the timer hits 0 the prompt is auto-submitted and the AI draws a fresh image from it.
 - At the end, the target and its 10 details are shown alongside the relay and an AI judge scores the final image out of 10.
 - One group plays at a time; results go on a shared **leaderboard**.
 
@@ -20,24 +20,23 @@ A **prompting-skill** relay party game. A group recreates a **target image** —
 ## How to play (game flow)
 
 1. **Group name** is entered → a new game session is created, a target is assigned, and play jumps straight into Step 1.
-2. **Step 1 — player 1:** the target is shown beside a blank canvas. Player 1 has **30 seconds** to type a prompt describing the target. On timeout the prompt is auto-submitted and the AI **generates the base image** from it (text-to-image).
-3. **Step 2 — player 2:** the target and the image from step 1 are shown. Player 2 has **30 seconds** to type a prompt describing what to add/change. On timeout the AI **edits the current image** with that prompt (image-to-image).
-4. **Step 3 — player 3 (or players 3 + 4 together):** the target and the image from step 2 are shown, edited the same way into the **final image**.
+2. **Step 1 — player 1:** the target is shown. Player 1 has **30 seconds** to type a prompt describing it. On timeout the prompt is auto-submitted and the AI **draws the base image** from it (text-to-image).
+3. **Step 2 — player 2:** **only the image from step 1 is shown** (not the target). Player 2 has **30 seconds** to describe what they see. On timeout the AI **draws a fresh image** from that description (text-to-image).
+4. **Step 3 — player 3 (or players 3 + 4 together):** **only the image from step 2 is shown**, redrawn the same way into the **final image**.
 5. There are always **3 steps total**:
    - **3-person group:** each member does one solo step.
    - **4-person group:** two members do solo steps and the remaining two **pair up** to write one prompt together within the same 30 seconds.
 
-> The **target stays on screen** the whole game. On steps 2–3 each player describes what to **add or change** on the current image to move it closer to the target — they don't restart it from scratch.
+> Only player 1 ever sees the target. Every later player describes **what they see in the previous player's image**, and the AI redraws it from scratch — information degrades down the chain, like broken telephone.
 
 ## Timing rules
 
 - Each prompt: **30 seconds**, hard cap. A visible countdown drives the UI and **auto-submits** whatever is in the box when it reaches 0.
-- **Empty prompt at timeout:** the current image is kept unchanged and that step is forfeited (a wasted turn). If step 1 is empty, the base image stays blank and the next non-empty prompt generates the base image instead of editing.
+- **Empty prompt at timeout:** the previous image is kept unchanged and that step is forfeited (a wasted turn). If step 1 is empty, no base image exists yet, so the next non-empty prompt draws the first image.
 
 ## Image generation mechanic
 
-- **Step 1 = generate** (text-to-image): the first prompt creates the base image.
-- **Steps 2–3 = edit** (image-to-image): each later prompt edits the current image so the image builds up coherently over the relay.
+- **Every step = generate** (text-to-image): each non-empty prompt draws a **brand-new image** from the player's words. The previous image is shown only so the player can describe it; its pixels are never carried forward. Redrawing at every step (rather than editing) is what produces the broken-telephone drift.
 
 ## Scoring
 
@@ -100,8 +99,8 @@ prompt-relay/
 
 - `GET /` — group name entry.
 - `POST /game` — create game, assign a target → redirect straight to step 1.
-- `GET /game/{id}/round/{n}` — target + current image + 30s timer + prompt input.
-- `POST /game/{id}/round/{n}` — submit prompt → generate/edit image → next step or reveal.
+- `GET /game/{id}/round/{n}` — step 1 shows the target; steps 2–3 show only the previous player's image (never the target) + 30s timer + prompt input.
+- `POST /game/{id}/round/{n}` — submit prompt → draw a fresh image → next step or reveal.
 - `GET /game/{id}/reveal` — target + 10 details + relay progression + detail score.
 - `GET /leaderboard` — ranked results; the page subscribes to Supabase realtime for live updates.
 - Reference and generated images are uploaded to the **Supabase Storage** bucket; pages reference their public URLs.
