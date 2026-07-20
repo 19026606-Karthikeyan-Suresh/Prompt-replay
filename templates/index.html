@@ -9,7 +9,7 @@
         image and describes it. Each next player sees <strong>only the picture the
         player before them made</strong> — never the target — and describes that, so the
         AI redraws it and the image drifts down the chain. The AI judge scores your
-        final image against the target's <strong>10 secret details</strong>.
+        final image against the target's <strong>secret details</strong>.
     </p>
 
     <form class="stack" action="/game" method="post">
@@ -17,6 +17,12 @@
             <span>Group name</span>
             <input type="text" name="group_name" maxlength="60" required
                    placeholder="e.g. The Rembrandts" autofocus />
+        </label>
+
+        <label class="field">
+            <span>Group ID</span>
+            <input type="text" name="group_id" maxlength="40" required
+                   placeholder="e.g. G-07" />
         </label>
 
         <label class="field">
@@ -38,7 +44,7 @@
         <li><strong>Steps 2 &amp; 3:</strong> the next player sees <strong>only the previous player's image</strong> (not the target), describes what they see → the AI redraws it from scratch.</li>
         <li><strong>No talking or coaching</strong> — the picture is the only thing passed on. That's what makes it broken telephone.</li>
         <li>Timer hits 0 → whatever is typed is auto-submitted. Empty box = a forfeited turn.</li>
-        <li>Reveal: the target, its 10 details, your relay, and your score out of 10.</li>
+        <li>Reveal: the target, your relay, and your percentage score.</li>
     </ol>
 </section>
 {% endblock %}

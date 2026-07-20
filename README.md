@@ -24,9 +24,13 @@ scores the final image out of 10, similarity breaks ties, and results land on a
    it in 30s → AI **redraws** a fresh image from that description.
 4. **Step 3** (Player 3, or Players 3 & 4 paired in a 4-person group): sees **only
    Player 2's image**, describes it → AI redraws the final image.
-5. **Reveal**: the target, the 10 details, the full relay, and the score out of 10 —
-   the first time anyone but Player 1 sees the original.
-6. Result is appended to the **leaderboard** (ranked by detail score, then similarity).
+5. **Reveal**: the target, the full relay, and a single **percentage** score — the
+   first time anyone but Player 1 sees the original. The individual target details
+   (and the fact there are exactly 10) are hidden here so a finished group can't
+   leak the target to groups still to play.
+6. Result is appended to the **leaderboard** (ranked by detail score, then
+   similarity). The board shows one percentage per group; clicking a group opens a
+   modal with its per-detail breakdown and a button to download its final image.
 
 **No talking or coaching** between players — the image is the only thing passed down
 the chain (that's what makes it broken telephone).
@@ -59,7 +63,9 @@ pip install -r requirements.txt
 2. In the **SQL editor**, run [`supabase/schema.sql`](supabase/schema.sql). This
    creates the `games` and `leaderboard` tables, RLS policies (anon may only
    *read* the leaderboard), the realtime publication, and the public `images`
-   Storage bucket.
+   Storage bucket. The file is idempotent and includes `alter table … add column
+   if not exists group_id` statements, so **re-running it on an existing project**
+   adds the participant-entered Group ID column without touching your data.
 3. Confirm a public bucket named **`images`** exists under **Storage** (the SQL
    creates it; you can also create it from the UI).
 
@@ -75,6 +81,13 @@ Copy `.env.example` to `.env` and fill in:
   ships as `PROVIDER_ORDER=openai` because Gemini image generation needs a paid
   Google account (see [AI providers](#ai-providers)); switch to `gemini,openai`
   once Gemini billing is enabled.
+- `SITE_PASSWORD` gates the whole site behind a static password. Leave it **blank**
+  to run open (local dev/tests). When set, every page except `/login` and static
+  assets requires it, enforced by an ASGI middleware and a signed cookie — so it
+  works the same locally and on Vercel. On Vercel, set `SITE_PASSWORD` (and
+  optionally `SITE_SECRET`) in **Project → Settings → Environment Variables**. The
+  live leaderboard's realtime updates still work on any device once past the gate
+  (the browser subscribes to Supabase directly with the read-only anon key).
 
 ### 4. Seed the reference pool
 

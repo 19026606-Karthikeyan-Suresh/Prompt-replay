@@ -8,12 +8,8 @@
 
     <div class="score-row">
         <div class="score-badge">
-            <span class="score-num">{{ detail_score }}</span><span class="score-den">/ 10</span>
-            <span class="score-label">details captured</span>
-        </div>
-        <div class="score-badge subtle">
-            <span class="score-num">{{ similarity_pct }}%</span>
-            <span class="score-label">similarity (tiebreaker)</span>
+            <span class="score-num">{{ pct }}%</span>
+            <span class="score-label">of the picture recreated</span>
         </div>
     </div>
 </section>
@@ -38,19 +34,6 @@
             <figcaption>Your final image</figcaption>
         </figure>
     </div>
-</section>
-
-<section class="card">
-    <h2>The 10 details</h2>
-    <ul class="verdict-list">
-        {% for v in verdicts %}
-        <li class="verdict {{ 'hit' if v.present else 'miss' }}">
-            <span class="mark">{{ '✓' if v.present else '✗' }}</span>
-            <span class="detail">{{ v.detail }}</span>
-            <span class="reason">{{ v.reason }}</span>
-        </li>
-        {% endfor %}
-    </ul>
 </section>
 
 <section class="card">

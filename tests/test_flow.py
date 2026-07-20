@@ -39,11 +39,12 @@ class FakeStore:
         """Pretend the reference is uploaded and return its URL."""
         return ref.public_url
 
-    def create_game(self, group_name, group_size, reference_id):
+    def create_game(self, group_name, group_size, reference_id, group_id=""):
         """Create and store a new game row, returning it."""
         row = {
             "id": str(uuid.uuid4()),
             "group_name": group_name,
+            "group_id": group_id,
             "group_size": group_size,
             "reference_id": reference_id,
             "current_step": 0,
@@ -74,12 +75,15 @@ class FakeStore:
         """Return previously stored bytes for a synthetic URL."""
         return self.images[url]
 
-    def insert_leaderboard(self, game_id, group_name, detail_score, similarity, final_image_url):
+    def insert_leaderboard(
+        self, game_id, group_name, detail_score, similarity, final_image_url, group_id=""
+    ):
         """Append a leaderboard result row and return it."""
         row = {
             "id": str(uuid.uuid4()),
             "game_id": game_id,
             "group_name": group_name,
+            "group_id": group_id,
             "detail_score": detail_score,
             "similarity": similarity,
             "final_image_url": final_image_url,
@@ -114,8 +118,9 @@ def fake_store(monkeypatch):
 
 def test_full_relay_three_person(fake_store):
     """A full 3-step relay redraws each turn; the reveal scores it lazily."""
-    new_game = game.create_new_game("Test Crew", 3)
+    new_game = game.create_new_game("Test Crew", 3, "G-01")
     gid = new_game["id"]
+    assert new_game["group_id"] == "G-01"
 
     # Step 1 draws the base image from Player 1's description of the target.
     g1 = game.submit_prompt(gid, 1, "a yellow beach umbrella and a red bucket")
@@ -141,9 +146,16 @@ def test_full_relay_three_person(fake_store):
     assert 0 <= scored["detail_score"] <= 10
     assert scored["judge_result"]["total"] == scored["detail_score"]
 
-    # The result was published to the leaderboard exactly once.
+    # The stored similarity is the DETAIL-BASED score: its displayed percentage
+    # lands in the band [detail_score*10, detail_score*10 + 9] (capped at 100).
+    displayed = round(scored["similarity"] * 100)
+    lo = scored["detail_score"] * 10
+    assert lo <= displayed <= min(100, lo + 9)
+
+    # The result was published to the leaderboard exactly once, with the group id.
     assert len(fake_store.leaderboard) == 1
     assert fake_store.leaderboard[0]["group_name"] == "Test Crew"
+    assert fake_store.leaderboard[0]["group_id"] == "G-01"
 
     # Broken telephone: the final image is redrawn from ONLY the last player's
     # prompt, so mock scoring credits step-3 details and drops earlier ones.

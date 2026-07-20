@@ -242,13 +242,16 @@ def fetch_image_bytes(url: str) -> bytes:
 # --------------------------------------------------------------------------- #
 # Game rows
 # --------------------------------------------------------------------------- #
-def create_game(group_name: str, group_size: int, reference_id: str) -> dict:
+def create_game(
+    group_name: str, group_size: int, reference_id: str, group_id: str = ""
+) -> dict:
     """Insert a new game row and return it.
 
     Args:
         group_name: The group's chosen name.
         group_size: Number of players (3 or 4).
         reference_id: The assigned reference id.
+        group_id: The event group identifier the participants entered (may be "").
 
     Returns:
         The inserted game row as a dict (including its generated ``id``).
@@ -257,6 +260,7 @@ def create_game(group_name: str, group_size: int, reference_id: str) -> dict:
         "group_name": group_name,
         "group_size": group_size,
         "reference_id": reference_id,
+        "group_id": group_id,
         "current_step": 0,
         "finished": False,
     }
@@ -297,6 +301,7 @@ def insert_leaderboard(
     detail_score: int,
     similarity: float,
     final_image_url: Optional[str],
+    group_id: str = "",
 ) -> dict:
     """Append a finished game's result to the leaderboard table.
 
@@ -306,8 +311,10 @@ def insert_leaderboard(
         game_id: The finished game's id.
         group_name: The group's name.
         detail_score: Number of details present (0..10).
-        similarity: Similarity to the reference (0..1).
+        similarity: The detail-based score fraction (0..1); the displayed
+            percentage is ``round(similarity * 100)``.
         final_image_url: Public URL of the group's final image.
+        group_id: The event group identifier (may be "").
 
     Returns:
         The inserted leaderboard row dict.
@@ -315,6 +322,7 @@ def insert_leaderboard(
     payload = {
         "game_id": game_id,
         "group_name": group_name,
+        "group_id": group_id,
         "detail_score": detail_score,
         "similarity": similarity,
         "final_image_url": final_image_url,
@@ -345,8 +353,10 @@ def leaderboard_has_game(game_id: str) -> bool:
 def list_leaderboard() -> List[dict]:
     """Return all leaderboard rows ranked for display.
 
-    Ordered by detail score (desc), then similarity (desc), then oldest-first,
-    matching the ranking used on the live page.
+    Ordered by the displayed score (``similarity`` desc — which now encodes the
+    detail-based percentage, tens = details captured, ones = tiebreaker), then
+    oldest-first. Ranking by the single shown number keeps the podium/table order
+    consistent with the percentages players see.
 
     Returns:
         A list of leaderboard row dicts in ranked order.
@@ -355,7 +365,6 @@ def list_leaderboard() -> List[dict]:
         _client()
         .table("leaderboard")
         .select("*")
-        .order("detail_score", desc=True)
         .order("similarity", desc=True)
         .order("created_at", desc=False)
         .execute()

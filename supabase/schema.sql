@@ -18,6 +18,7 @@ create table if not exists public.games (
     id            uuid primary key default gen_random_uuid(),
     created_at    timestamptz not null default now(),
     group_name    text not null,
+    group_id      text,                               -- event group identifier (participant-entered)
     group_size    int  not null default 3,           -- 3 or 4 players
     reference_id  text not null,                      -- assigned from the pool
     current_step  int  not null default 0,            -- 0 = not started, 1..3 = done through step
@@ -43,11 +44,18 @@ create table if not exists public.leaderboard (
     id              uuid primary key default gen_random_uuid(),
     game_id         uuid references public.games(id) on delete cascade,
     group_name      text not null,
+    group_id        text,                             -- event group identifier (participant-entered)
     detail_score    int not null,
+    -- The detail-based score fraction (0..1); displayed as round(similarity*100)%.
     similarity      numeric not null,
     final_image_url text,
     created_at      timestamptz not null default now()
 );
+
+-- Migration for projects created before group_id existed: add the columns
+-- in-place (safe to run repeatedly; no-ops once the columns exist).
+alter table public.games       add column if not exists group_id text;
+alter table public.leaderboard add column if not exists group_id text;
 
 -- Convenience ranked view (detail score desc, then similarity desc) used by the
 -- server to render the initial leaderboard ordering.

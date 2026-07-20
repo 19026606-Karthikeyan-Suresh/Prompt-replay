@@ -99,6 +99,17 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent-2); 
 .btn:active { transform: translateY(1px); }
 .btn.primary { background: var(--accent); border-color: transparent; color: #2a0a0a; }
 
+/* Login error banner */
+.login-error {
+    background: rgba(255, 122, 144, 0.14);
+    border: 1px solid var(--bad);
+    color: var(--bad);
+    border-radius: 12px;
+    padding: 10px 14px;
+    font-weight: 600;
+    margin: 0 0 8px;
+}
+
 /* Timer */
 .timer {
     font-variant-numeric: tabular-nums;
@@ -260,40 +271,147 @@ table.leaderboard tbody tr:hover { background: var(--bg-soft-2); }
 @keyframes live { 70% { box-shadow: 0 0 0 8px rgba(78,203,128,0); } }
 .empty-state { color: var(--ink-muted); text-align: center; padding: 30px; }
 
-/* Winners podium — three medal bands (gold/silver/bronze), each listing every
-   group tied at that score. A band with 2+ cards is a tie. */
-.podium { display: flex; flex-direction: column; gap: 14px; margin: 8px 0 26px; }
-.podium-tier {
-    border: 1px solid var(--border);
-    border-left: 5px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--bg-soft-2);
-    padding: 14px 16px;
+/* Winners podium — up to five ranked pedestals (rank 1 tallest, descending).
+   Each pedestal lists every group tied at that score, so a pedestal with 2+
+   cards is a tie. Cards are clickable to open the breakdown modal. */
+.podium {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 12px;
+    margin: 10px 0 28px;
+    flex-wrap: wrap;
 }
-.tier-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
-.tier-medal { font-size: 1.6rem; line-height: 1; }
-.tier-label { font-weight: 800; letter-spacing: 0.01em; }
-.tier-groups { display: flex; flex-wrap: wrap; gap: 12px; }
-.podium-place {
-    flex: 0 1 150px;
+.podium-tier {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
+    flex: 1 1 148px;
+    max-width: 220px;
+    min-width: 130px;
+}
+.tier-groups { display: flex; flex-direction: column; gap: 8px; width: 100%; margin-bottom: 10px; }
+.podium-place {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
     text-align: center;
-    padding: 14px 12px;
+    padding: 12px 10px;
     border-radius: 12px;
     background: var(--bg-soft);
     border: 1px solid var(--border);
+    cursor: pointer;
+    transition: transform 0.08s ease, filter 0.15s ease;
 }
-.podium-thumb { width: 72px; height: 72px; border-radius: 10px; object-fit: cover; border: 1px solid var(--border); }
+.podium-place:hover, .podium-place:focus-visible { filter: brightness(1.12); transform: translateY(-2px); outline: none; }
+.podium-thumb { width: 60px; height: 60px; border-radius: 10px; object-fit: cover; border: 1px solid var(--border); }
 .podium-name { font-weight: 800; }
-.podium-sim { color: var(--ink-muted); font-size: 0.85rem; }
-/* Medal accent per tier; gold gets a slightly larger medal. */
-.podium .tier-1 { border-left-color: #ffd24a; }
-.podium .tier-2 { border-left-color: #cfd3e0; }
-.podium .tier-3 { border-left-color: #e0975a; }
-.podium .tier-1 .tier-medal { font-size: 1.9rem; }
+.podium-gid { color: var(--ink-muted); font-size: 0.8rem; }
+.podium-pct { font-size: 1.3rem; font-weight: 800; color: var(--good); }
+/* Pedestal "riser" whose FIXED, rank-based height creates the stepped podium
+   (rank 1 tallest). Height is driven only by rank — never by label length — so
+   the steps always descend. Medal (or rank number) is centered on the riser. */
+.tier-riser {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px 12px 0 0;
+    background: var(--bg-soft-2);
+    border: 1px solid var(--border);
+    border-bottom: none;
+}
+.tier-medal { font-size: 1.9rem; line-height: 1; font-weight: 800; }
+/* Fixed-height caption below the riser so every column shares the same bottom
+   block; long "Tied for …" labels wrap inside it without shifting the steps. */
+.tier-caption {
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-weight: 800;
+    font-size: 0.82rem;
+    line-height: 1.15;
+    padding: 0 4px;
+}
+/* Descending riser heights + medal accents (gold/silver/bronze). */
+.podium .tier-1 .tier-riser { height: 92px; border-color: #ffd24a; background: linear-gradient(180deg, rgba(255,210,74,0.24), var(--bg-soft-2)); }
+.podium .tier-2 .tier-riser { height: 74px; border-color: #cfd3e0; background: linear-gradient(180deg, rgba(207,211,224,0.18), var(--bg-soft-2)); }
+.podium .tier-3 .tier-riser { height: 58px; border-color: #e0975a; background: linear-gradient(180deg, rgba(224,151,90,0.18), var(--bg-soft-2)); }
+.podium .tier-4 .tier-riser { height: 44px; }
+.podium .tier-5 .tier-riser { height: 32px; }
+.podium .tier-1 .tier-medal { font-size: 2.2rem; }
+
+/* Table rows are clickable to open the breakdown modal. */
+.leaderboard tbody tr.lb-row { cursor: pointer; }
+
+/* Breakdown modal (opened from the leaderboard). */
+.lb-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(15, 18, 38, 0.82);
+    backdrop-filter: blur(6px);
+    animation: gen-fade 0.2s ease;
+}
+.lb-modal[hidden] { display: none; }
+.lb-modal__box {
+    position: relative;
+    width: 100%;
+    max-width: 560px;
+    max-height: 88vh;
+    overflow-y: auto;
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 28px;
+}
+.lb-modal__close {
+    position: absolute;
+    top: 10px;
+    right: 14px;
+    background: none;
+    border: none;
+    color: var(--ink-muted);
+    font-size: 1.9rem;
+    line-height: 1;
+    cursor: pointer;
+}
+.lb-modal__close:hover { color: var(--ink); }
+.modal-gid { color: var(--ink-muted); font-weight: 600; font-size: 1rem; }
+#lb-download { margin: 4px 0 18px; }
+/* Caption under the swappable generated image (which round + its prompt). */
+#modal-gen-cap { text-align: center; color: var(--ink-muted); margin-top: 8px; font-weight: 700; }
+#modal-gen-cap .prompt-quote { display: block; font-style: italic; font-weight: 400; color: var(--ink); margin-top: 4px; }
+/* Toggle bar: one compressed thumbnail per generated round; the active one is
+   accented. Clicking swaps the large generated image above. */
+.modal-toggle-bar { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 14px 0 4px; }
+.modal-toggle {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 6px;
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg-soft-2);
+    color: var(--ink-muted);
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: border-color 0.12s ease, filter 0.12s ease;
+}
+.modal-toggle:hover { filter: brightness(1.12); }
+.modal-toggle.active { border-color: var(--accent-2); color: var(--ink); }
+.modal-toggle-thumb { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); display: block; }
 
 /* How-to list + hero */
 .hero .lede { max-width: 60ch; }

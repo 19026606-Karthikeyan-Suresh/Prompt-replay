@@ -78,6 +78,11 @@ class Settings:
         provider_order: Ordered provider names to try (e.g. ["gemini","openai"]).
         enable_mock: Whether to append the keyless mock as a final fallback.
         prompt_seconds: Seconds allowed per prompt before auto-submit.
+        site_password: Static password gating the whole site. When empty the gate
+            is DISABLED (local/dev and tests run open); when set, every page except
+            the login screen and static assets requires it.
+        site_secret: Secret used to sign the auth cookie. Falls back to
+            ``site_password`` when unset so a single env var is enough.
     """
 
     supabase_url: str
@@ -98,6 +103,30 @@ class Settings:
     provider_order: List[str] = field(default_factory=list)
     enable_mock: bool = True
     prompt_seconds: int = 30
+
+    # Static site password gate (disabled when site_password is empty).
+    site_password: str = ""
+    site_secret: str = ""
+
+    @property
+    def auth_enabled(self) -> bool:
+        """Whether the static password gate is active.
+
+        Returns:
+            True when a non-empty ``site_password`` is configured, meaning every
+            protected route requires a valid auth cookie.
+        """
+        return bool(self.site_password)
+
+    @property
+    def cookie_secret(self) -> str:
+        """Signing secret for the auth cookie.
+
+        Returns:
+            ``site_secret`` when set, otherwise ``site_password`` so a single
+            configured value still yields a stable HMAC key.
+        """
+        return self.site_secret or self.site_password
 
     @property
     def supabase_configured(self) -> bool:
@@ -143,6 +172,9 @@ def get_settings() -> Settings:
         provider_order=provider_order,
         enable_mock=_get_bool("ENABLE_MOCK", True),
         prompt_seconds=_get_int("PROMPT_SECONDS", 30),
+        # Static password gate: unset -> open site (dev/tests); set -> gated.
+        site_password=os.getenv("SITE_PASSWORD", "").strip(),
+        site_secret=os.getenv("SITE_SECRET", "").strip(),
     )
 
 

@@ -5,10 +5,11 @@ from __future__ import annotations
 import pytest
 
 from app import game
+from app.main import _tier_key, top_tiers
 from app.providers.base import AllProvidersFailed, ImageProvider
 from app.providers.fallback import FallbackImageProvider
 from app.providers.mock import MockImageProvider, MockJudge
-from app.scoring import compute_scores
+from app.scoring import compute_scores, detail_based_score
 
 
 # --------------------------------------------------------------------------- #
@@ -129,3 +130,58 @@ def test_compute_scores_ranges():
     assert 0.0 <= outcome.similarity <= 1.0
     assert len(outcome.judge_result.verdicts) == 10
     assert outcome.judge_result.total == outcome.detail_score
+    # The stored similarity encodes the detail-based percentage band.
+    displayed = round(outcome.similarity * 100)
+    assert outcome.detail_score * 10 <= displayed <= min(100, outcome.detail_score * 10 + 9)
+
+
+# --------------------------------------------------------------------------- #
+# Detail-based percentage
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize(
+    "detail_score,visual,expected_lo,expected_hi",
+    [
+        (8, 0.0, 80, 80),     # no visual bonus -> exactly the band floor
+        (8, 1.0, 89, 89),     # max visual bonus -> top of the band
+        (8, 0.5, 84, 85),     # mid bonus stays inside the 80s band
+        (10, 1.0, 100, 100),  # perfect capped at 100 (never 109)
+        (0, 0.0, 0, 0),       # blank -> zero
+    ],
+)
+def test_detail_based_score_bands(detail_score, visual, expected_lo, expected_hi):
+    """The displayed percentage stays in [score*10, score*10+9], capped at 100."""
+    pct = round(detail_based_score(detail_score, visual) * 100)
+    assert expected_lo <= pct <= expected_hi
+    assert detail_score * 10 <= pct <= min(100, detail_score * 10 + 9)
+
+
+# --------------------------------------------------------------------------- #
+# Podium tiers (top_tiers / _tier_key)
+# --------------------------------------------------------------------------- #
+def _row(detail_score, similarity):
+    """Build a minimal leaderboard row for tier tests."""
+    return {"detail_score": detail_score, "similarity": similarity}
+
+
+def test_tier_key_uses_displayed_percentage():
+    """Rows shown as the same percentage share a tier key despite raw-float drift."""
+    assert _tier_key(_row(8, 0.844)) == _tier_key(_row(8, 0.836)) == 84
+
+
+def test_top_tiers_five_tiers_with_ties_and_ordinals():
+    """top_tiers builds up to 5 tiers; tied groups group; ranks 4/5 are ordinals."""
+    rows = [
+        _row(10, 1.00),  # 100% -> Gold
+        _row(9, 0.95),   # 95%  -> Silver (two tied)
+        _row(9, 0.95),
+        _row(8, 0.80),   # 80%  -> Bronze
+        _row(7, 0.70),   # 70%  -> 4th
+        _row(6, 0.60),   # 60%  -> 5th
+        _row(5, 0.50),   # 50%  -> dropped (beyond top 5)
+    ]
+    tiers = top_tiers(rows, 5)
+    assert [t["label"] for t in tiers] == ["Gold", "Silver", "Bronze", "4th", "5th"]
+    assert [len(t["groups"]) for t in tiers] == [1, 2, 1, 1, 1]
+    # Ranks beyond bronze carry no medal glyph.
+    assert tiers[0]["medal"] == "🥇"
+    assert tiers[3]["medal"] == "" and tiers[4]["medal"] == ""

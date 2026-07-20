@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Sign in — Prompt Relay{% endblock %}
+
+{% block content %}
+<section class="card hero" style="max-width: 460px; margin: 0 auto;">
+    <h1>🔒 Prompt Relay</h1>
+    <p class="lede">Enter the event password to continue.</p>
+
+    {% if error %}
+    <p class="login-error">{{ error }}</p>
+    {% endif %}
+
+    <form class="stack" action="/login" method="post">
+        <label class="field">
+            <span>Password</span>
+            <input type="password" name="password" required autofocus
+                   placeholder="Event password" />
+        </label>
+        <button class="btn primary" type="submit">Enter →</button>
+    </form>
+</section>
+{% endblock %}

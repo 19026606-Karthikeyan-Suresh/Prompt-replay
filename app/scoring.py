@@ -22,14 +22,40 @@ class ScoreOutcome:
     """The computed result of scoring a final image.
 
     Attributes:
-        detail_score: Number of the 10 details judged present (0..10).
-        similarity: Visual similarity to the reference, 0.0..1.0.
-        judge_result: Full per-detail breakdown for the reveal page.
+        detail_score: Number of the target details judged present (0..10).
+        similarity: The detail-based score fraction, 0.0..1.0. The displayed
+            percentage is ``round(similarity * 100)``: the tens digit is the
+            number of details captured (``detail_score * 10``) and the ones digit
+            is a small tiebreaker derived from raw visual similarity, so a group
+            with 8/10 details lands in the 80–89% band and a closer image ranks
+            higher within it.
+        judge_result: Full per-detail breakdown for the reveal/modal.
     """
 
     detail_score: int
     similarity: float
     judge_result: JudgeResult
+
+
+def detail_based_score(detail_score: int, visual_similarity: float) -> float:
+    """Combine the detail count and raw visual similarity into one 0..1 fraction.
+
+    The displayed percentage (``round(result * 100)``) always falls in the band
+    ``[detail_score*10, detail_score*10 + 9]`` and is capped at 100, so the number
+    a group sees reflects how many target details they captured, with a
+    visual-similarity nudge that only ever breaks ties within the same band.
+
+    Args:
+        detail_score: Number of target details judged present (0..10).
+        visual_similarity: Raw image-to-reference similarity, 0.0..1.0.
+
+    Returns:
+        The combined score fraction in ``[0.0, 1.0]``.
+    """
+    # Ones digit (0..9) from visual similarity — a within-band tiebreaker only.
+    bonus = min(9, max(0, round(float(visual_similarity) * 9)))
+    pct = min(100, detail_score * 10 + bonus)
+    return pct / 100.0
 
 
 def _blank_outcome(details: List[str]) -> ScoreOutcome:
@@ -61,17 +87,20 @@ def compute_scores(
 
     Args:
         final_image_bytes: The group's final image bytes.
-        reference_image_bytes: The reference image bytes (for similarity).
-        details: The 10 target detail phrases.
+        reference_image_bytes: The reference image bytes (for the tiebreaker).
+        details: The target detail phrases.
         judge: Judge to use; defaults to the configured fallback chain. Injected
             in tests so the mock judge can run without Supabase.
 
     Returns:
-        A :class:`ScoreOutcome` with detail score, similarity, and breakdown.
+        A :class:`ScoreOutcome` whose ``similarity`` is the detail-based score
+        fraction (see :func:`detail_based_score`), not raw visual similarity.
     """
     active_judge = judge or build_judge()
     result = active_judge.score(final_image_bytes, details)
-    similarity = active_judge.similarity(final_image_bytes, reference_image_bytes)
+    # Raw visual similarity is used only as a within-band tiebreaker below.
+    visual_similarity = active_judge.similarity(final_image_bytes, reference_image_bytes)
+    similarity = detail_based_score(result.total, visual_similarity)
     return ScoreOutcome(detail_score=result.total, similarity=similarity, judge_result=result)
 
 
@@ -118,5 +147,6 @@ def finalize_game(game: dict, final_image_url: Optional[str]) -> dict:
             detail_score=outcome.detail_score,
             similarity=outcome.similarity,
             final_image_url=final_image_url,
+            group_id=game.get("group_id") or "",
         )
     return updated

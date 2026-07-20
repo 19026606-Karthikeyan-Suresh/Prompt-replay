@@ -7,16 +7,19 @@ templates and issue redirects to move the relay from one screen to the next.
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import os
+import time
 
 from fastapi import FastAPI, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from . import game, storage
 from .config import get_settings
-from .providers.base import AllProvidersFailed
+from .providers.base import AllProvidersFailed, JudgeResult
 from .storage import StorageNotConfigured
 
 # Project root = parent of this app/ package; templates/ and static/ sit there.
@@ -25,6 +28,152 @@ _BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 app = FastAPI(title="Prompt Relay")
 app.mount("/static", StaticFiles(directory=os.path.join(_BASE_DIR, "static")), name="static")
 templates = Jinja2Templates(directory=os.path.join(_BASE_DIR, "templates"))
+
+# --------------------------------------------------------------------------- #
+# Static password gate
+# --------------------------------------------------------------------------- #
+# Name of the signed auth cookie set after a successful /login.
+_AUTH_COOKIE = "pr_auth"
+# How long a successful login stays valid before /login is required again.
+_AUTH_TTL_SECONDS = 12 * 60 * 60  # 12 hours
+# Path prefixes/exact paths reachable WITHOUT auth: the login screen itself, the
+# static assets that style it, a health check, and the favicon.
+_PUBLIC_PATHS = ("/login", "/healthz", "/favicon.ico")
+
+
+def _sign(expiry: int, secret: str) -> str:
+    """Compute the HMAC signature for an auth token with the given expiry.
+
+    Args:
+        expiry: Unix epoch seconds after which the token is invalid.
+        secret: The signing secret (:attr:`Settings.cookie_secret`).
+
+    Returns:
+        A hex HMAC-SHA256 signature over ``authed:<expiry>``.
+    """
+    message = f"authed:{expiry}".encode("utf-8")
+    return hmac.new(secret.encode("utf-8"), message, hashlib.sha256).hexdigest()
+
+
+def _make_auth_token(secret: str) -> str:
+    """Build a fresh signed auth cookie value.
+
+    Args:
+        secret: The signing secret.
+
+    Returns:
+        A ``"<expiry>.<signature>"`` token valid for :data:`_AUTH_TTL_SECONDS`.
+    """
+    expiry = int(time.time()) + _AUTH_TTL_SECONDS
+    return f"{expiry}.{_sign(expiry, secret)}"
+
+
+def _auth_token_valid(token: str, secret: str) -> bool:
+    """Check that an auth cookie value is well-formed, unexpired, and authentic.
+
+    Args:
+        token: The raw cookie value (``"<expiry>.<signature>"``).
+        secret: The signing secret to verify against.
+
+    Returns:
+        True if the token parses, has not expired, and its signature matches.
+    """
+    try:
+        expiry_str, signature = token.split(".", 1)
+        expiry = int(expiry_str)
+    except (ValueError, AttributeError):
+        return False
+    if expiry < int(time.time()):
+        return False
+    # Constant-time compare so a wrong cookie can't be brute-forced by timing.
+    return hmac.compare_digest(signature, _sign(expiry, secret))
+
+
+@app.middleware("http")
+async def require_login(request: Request, call_next):
+    """Gate every non-public route behind the static site password.
+
+    When no ``SITE_PASSWORD`` is configured the gate is disabled (dev/tests run
+    open). Otherwise any request without a valid auth cookie to a non-public path
+    is redirected to ``/login``.
+
+    Args:
+        request: The incoming request.
+        call_next: The downstream ASGI handler.
+
+    Returns:
+        The downstream response, or a 303 redirect to ``/login``.
+    """
+    settings = get_settings()
+    path = request.url.path
+    is_public = path.startswith("/static/") or path in _PUBLIC_PATHS
+    if settings.auth_enabled and not is_public:
+        token = request.cookies.get(_AUTH_COOKIE, "")
+        if not _auth_token_valid(token, settings.cookie_secret):
+            return RedirectResponse(url="/login", status_code=303)
+    return await call_next(request)
+
+
+@app.get("/healthz")
+def healthz() -> JSONResponse:
+    """Unauthenticated health check for uptime probes.
+
+    Returns:
+        A tiny JSON ``{"ok": true}`` payload.
+    """
+    return JSONResponse({"ok": True})
+
+
+@app.get("/login", response_class=HTMLResponse)
+def login_form(request: Request) -> HTMLResponse:
+    """Render the password entry screen (or bounce home if already authed).
+
+    Args:
+        request: The incoming request.
+
+    Returns:
+        The login page, or a redirect to ``/`` when the gate is off or the
+        visitor already holds a valid cookie.
+    """
+    settings = get_settings()
+    if not settings.auth_enabled:
+        return RedirectResponse(url="/", status_code=303)
+    token = request.cookies.get(_AUTH_COOKIE, "")
+    if _auth_token_valid(token, settings.cookie_secret):
+        return RedirectResponse(url="/", status_code=303)
+    return templates.TemplateResponse(request, "login.html", {"error": None})
+
+
+@app.post("/login")
+def login_submit(request: Request, password: str = Form("")):
+    """Validate the submitted password and set the auth cookie on success.
+
+    Args:
+        request: The incoming request.
+        password: The password submitted from the login form.
+
+    Returns:
+        A redirect to ``/`` with the auth cookie set on success, or the login
+        page re-rendered with an error on failure.
+    """
+    settings = get_settings()
+    if not settings.auth_enabled:
+        return RedirectResponse(url="/", status_code=303)
+    # Constant-time compare so the password can't be guessed by timing.
+    if hmac.compare_digest(password, settings.site_password):
+        response = RedirectResponse(url="/", status_code=303)
+        response.set_cookie(
+            _AUTH_COOKIE,
+            _make_auth_token(settings.cookie_secret),
+            max_age=_AUTH_TTL_SECONDS,
+            httponly=True,
+            secure=True,
+            samesite="lax",
+        )
+        return response
+    return templates.TemplateResponse(
+        request, "login.html", {"error": "Incorrect password."}, status_code=401
+    )
 
 
 def _error_page(request: Request, message: str, retry_url: str, status_code: int = 500) -> HTMLResponse:
@@ -61,19 +210,22 @@ def index(request: Request) -> HTMLResponse:
 
 
 @app.post("/game")
-def create_game(group_name: str = Form(...), group_size: int = Form(3)):
+def create_game(
+    group_name: str = Form(...), group_size: int = Form(3), group_id: str = Form("")
+):
     """Create a game, assign a reference, and redirect straight to step 1.
 
     Args:
         group_name: The group's chosen name (from the form).
         group_size: Number of players, 3 or 4 (from the form).
+        group_id: The event group identifier the participants entered (from the form).
 
     Returns:
         A redirect to the step 1 round screen, or an error page if Supabase
         or the reference pool is not ready.
     """
     try:
-        new_game = game.create_new_game(group_name, group_size)
+        new_game = game.create_new_game(group_name, group_size, group_id)
     except (StorageNotConfigured, RuntimeError) as exc:
         # Rendered without a Request-bound template here would fail; build inline.
         return HTMLResponse(f"<h1>Setup incomplete</h1><p>{exc}</p>", status_code=500)
@@ -221,9 +373,10 @@ def reveal(request: Request, game_id: str) -> HTMLResponse:
             }
         )
 
-    # judge_result is stored as JSON; verdicts drive the per-detail checklist.
-    judge_result = current.get("judge_result") or {"verdicts": []}
-    similarity_pct = round(float(current.get("similarity") or 0) * 100)
+    # A single percentage is shown to participants — the number of details they
+    # recreated. The target detail phrases and the "out of 10" count are hidden
+    # here so a finished group can't leak the target to groups still to play.
+    pct = round(float(current.get("similarity") or 0) * 100)
 
     return templates.TemplateResponse(
         request,
@@ -231,27 +384,94 @@ def reveal(request: Request, game_id: str) -> HTMLResponse:
         {
             "game": current,
             "reference_image_url": reference_image_url,
-            "details": reference.details,
             "steps": steps,
-            "verdicts": judge_result.get("verdicts", []),
-            "detail_score": current.get("detail_score"),
-            "similarity_pct": similarity_pct,
+            "pct": pct,
             "final_image_url": game.latest_image_url(current),
         },
     )
 
 
+@app.get("/game/{game_id}/breakdown")
+def breakdown(game_id: str):
+    """Return a finished game's full breakdown as JSON (for the modal).
+
+    The leaderboard modal fetches this when a card is clicked. Returns the group's
+    ids, the displayed percentage, the present/absent verdicts (from the stored
+    ``judge_result``), the target image URL, each round's generated image + prompt,
+    and the final image URL — enough to show the target beside a swappable,
+    per-round generated image with a thumbnail toggle bar.
+
+    Args:
+        game_id: The game's id.
+
+    Returns:
+        A JSON payload, or a 404 JSON error if the game/breakdown is unavailable.
+    """
+    current = storage.get_game(game_id)
+    if current is None:
+        return JSONResponse({"error": "Game not found."}, status_code=404)
+
+    # Look the reference up once. A stale game whose pool reference was later
+    # removed still opens fine — the target image is just omitted and the checklist
+    # falls back to the stored verdicts.
+    reference = None
+    reference_image_url = None
+    try:
+        reference = storage.get_reference(current["reference_id"])
+        reference_image_url = storage.ensure_reference_uploaded(reference)
+    except KeyError:
+        pass
+
+    # The stored judge_result already holds the full per-detail breakdown.
+    stored = current.get("judge_result") or {}
+    result = JudgeResult.from_dict(stored) if stored else JudgeResult()
+    verdicts = [
+        {"detail": v.detail, "present": v.present, "reason": v.reason}
+        for v in result.verdicts
+    ]
+    # Fallback for a game that was never scored: list its details (all absent) when
+    # the reference is still available; otherwise return an empty checklist.
+    if not verdicts and reference is not None:
+        verdicts = [
+            {"detail": d, "present": False, "reason": ""} for d in reference.details
+        ]
+
+    # One entry per round for the toggle bar (mirrors the reveal page's relay).
+    steps = [
+        {
+            "step": i,
+            "player": game.player_label(current["group_size"], i),
+            "prompt": current.get(f"prompt_{i}") or "",
+            "image_url": current.get(f"image_url_{i}"),
+        }
+        for i in range(1, game.TOTAL_STEPS + 1)
+    ]
+
+    return JSONResponse(
+        {
+            "group_name": current.get("group_name"),
+            "group_id": current.get("group_id") or "",
+            "pct": round(float(current.get("similarity") or 0) * 100),
+            "verdicts": verdicts,
+            "reference_image_url": reference_image_url,
+            "steps": steps,
+            "final_image_url": game.latest_image_url(current),
+        }
+    )
+
+
 # Medal glyph + label per podium tier (index 0 = top score). Mirrors MEDALS /
-# LABELS in static/js/leaderboard.js — keep the two in sync.
-_PODIUM_MEDALS = [("🥇", "Gold"), ("🥈", "Silver"), ("🥉", "Bronze")]
+# LABELS in static/js/leaderboard.js — keep the two in sync. Ranks beyond bronze
+# have no medal glyph and use an ordinal label ("4th", "5th").
+_PODIUM_MEDALS = [("🥇", "Gold"), ("🥈", "Silver"), ("🥉", "Bronze"), ("", "4th"), ("", "5th")]
 
 
-def _tier_key(row: dict) -> tuple:
-    """Score key that defines a medal tier: detail score + displayed similarity %.
+def _tier_key(row: dict) -> int:
+    """Score key that defines a medal tier: the displayed percentage.
 
-    Similarity is keyed on its rounded percentage — the value players actually
-    see — so two groups both shown as "75%" share a tier even if their raw floats
-    differ by a hair. Mirrors ``tierKey()`` in static/js/leaderboard.js.
+    Keyed on the rounded percentage — the single value players actually see — so
+    two groups both shown as "80%" share a tier even if their raw floats differ by
+    a hair. Mirrors ``tierKey()`` in static/js/leaderboard.js.
 
     Args:
         row: A leaderboard row.
@@ -259,10 +479,10 @@ def _tier_key(row: dict) -> tuple:
     Returns:
         A hashable key; rows with equal keys belong to the same medal tier.
     """
-    return (row["detail_score"], round(float(row["similarity"] or 0) * 100))
+    return round(float(row["similarity"] or 0) * 100)
 
 
-def top_tiers(rows: list, count: int = 3) -> list:
+def top_tiers(rows: list, count: int = 5) -> list:
     """Group rank-ordered leaderboard rows into up to ``count`` medal tiers.
 
     Consecutive rows sharing a :func:`_tier_key` form one tier, so every group
@@ -274,7 +494,7 @@ def top_tiers(rows: list, count: int = 3) -> list:
 
     Args:
         rows: Leaderboard rows in rank order.
-        count: Maximum number of medal tiers to build (default 3).
+        count: Maximum number of podium tiers to build (default 5).
 
     Returns:
         A list of tier dicts: ``{"medal", "label", "groups": [row, ...]}``.
@@ -316,7 +536,7 @@ def leaderboard(request: Request) -> HTMLResponse:
         "leaderboard.html",
         {
             "rows": rows,
-            # Top-3 medal tiers (ties featured) for the winners podium.
+            # Top-5 podium tiers (ties featured) for the winners podium.
             "podium_tiers": top_tiers(rows),
             # Public, read-only credentials — safe to embed in the page.
             "supabase_url": settings.supabase_url,

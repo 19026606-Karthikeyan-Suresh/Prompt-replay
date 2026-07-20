@@ -104,12 +104,13 @@ def next_step(game: dict) -> int:
 # --------------------------------------------------------------------------- #
 # Orchestration (touches storage + providers + scoring)
 # --------------------------------------------------------------------------- #
-def create_new_game(group_name: str, group_size: int) -> dict:
+def create_new_game(group_name: str, group_size: int, group_id: str = "") -> dict:
     """Create a game session and assign it a reference from the pool.
 
     Args:
         group_name: The group's chosen name.
         group_size: Number of players; clamped to the supported range 3..4.
+        group_id: The event group identifier the participants entered (may be "").
 
     Returns:
         The newly created game row dict (including its ``id``).
@@ -117,7 +118,9 @@ def create_new_game(group_name: str, group_size: int) -> dict:
     # Clamp defensively so a hand-edited form can't create an out-of-range game.
     size = 4 if int(group_size) >= 4 else 3
     reference = storage.assign_reference()
-    return storage.create_game(group_name.strip() or "Unnamed group", size, reference.id)
+    return storage.create_game(
+        group_name.strip() or "Unnamed group", size, reference.id, group_id.strip()
+    )
 
 
 def submit_prompt(game_id: str, step: int, prompt: str) -> dict:
