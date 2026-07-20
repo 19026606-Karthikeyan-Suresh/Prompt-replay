@@ -68,7 +68,7 @@ function escapeHtml(value) {
 // _PODIUM_MEDALS in app/main.py — keep the two in sync. Ranks beyond bronze have
 // no medal glyph; the podium shows the rank number instead.
 const MEDALS = ["🥇", "🥈", "🥉", "", ""];
-const LABELS = ["Gold", "Silver", "Bronze", "4th", "5th"];
+const LABELS = ["1st", "2nd", "3rd", "4th", "5th"];
 
 /**
  * Score key that defines a podium tier: the displayed percentage.

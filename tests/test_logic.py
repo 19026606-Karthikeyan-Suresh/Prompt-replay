@@ -180,7 +180,7 @@ def test_top_tiers_five_tiers_with_ties_and_ordinals():
         _row(5, 0.50),   # 50%  -> dropped (beyond top 5)
     ]
     tiers = top_tiers(rows, 5)
-    assert [t["label"] for t in tiers] == ["Gold", "Silver", "Bronze", "4th", "5th"]
+    assert [t["label"] for t in tiers] == ["1st", "2nd", "3rd", "4th", "5th"]
     assert [len(t["groups"]) for t in tiers] == [1, 2, 1, 1, 1]
     # Ranks beyond bronze carry no medal glyph.
     assert tiers[0]["medal"] == "🥇"

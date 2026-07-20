@@ -460,10 +460,10 @@ def breakdown(game_id: str):
     )
 
 
-# Medal glyph + label per podium tier (index 0 = top score). Mirrors MEDALS /
-# LABELS in static/js/leaderboard.js — keep the two in sync. Ranks beyond bronze
-# have no medal glyph and use an ordinal label ("4th", "5th").
-_PODIUM_MEDALS = [("🥇", "Gold"), ("🥈", "Silver"), ("🥉", "Bronze"), ("", "4th"), ("", "5th")]
+# Medal glyph + ordinal label per podium tier (index 0 = top score). Mirrors
+# MEDALS / LABELS in static/js/leaderboard.js — keep the two in sync. Ranks 1–3
+# get a medal glyph; ranks beyond bronze have none and rely on the ordinal label.
+_PODIUM_MEDALS = [("🥇", "1st"), ("🥈", "2nd"), ("🥉", "3rd"), ("", "4th"), ("", "5th")]
 
 
 def _tier_key(row: dict) -> int:
