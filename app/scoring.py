@@ -108,12 +108,15 @@ def finalize_game(game: dict, final_image_url: Optional[str]) -> dict:
         },
     )
 
-    # Append to the leaderboard — this is the row the live page observes.
-    storage.insert_leaderboard(
-        game_id=game["id"],
-        group_name=game["group_name"],
-        detail_score=outcome.detail_score,
-        similarity=outcome.similarity,
-        final_image_url=final_image_url,
-    )
+    # Append to the leaderboard — this is the row the live page observes. Guarded
+    # so a second scoring pass (e.g. a refresh of the reveal page while the judge
+    # calls are still running) never appends a duplicate row for the same game.
+    if not storage.leaderboard_has_game(game["id"]):
+        storage.insert_leaderboard(
+            game_id=game["id"],
+            group_name=game["group_name"],
+            detail_score=outcome.detail_score,
+            similarity=outcome.similarity,
+            final_image_url=final_image_url,
+        )
     return updated

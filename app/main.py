@@ -77,8 +77,8 @@ def create_game(group_name: str = Form(...), group_size: int = Form(3)):
     except (StorageNotConfigured, RuntimeError) as exc:
         # Rendered without a Request-bound template here would fail; build inline.
         return HTMLResponse(f"<h1>Setup incomplete</h1><p>{exc}</p>", status_code=500)
-    # The target stays on screen every round now, so there is no separate
-    # "memorise the reference" reveal — jump straight into Step 1.
+    # There is no separate reveal/memorise screen: Player 1 sees the target on
+    # their own Step 1 round screen, so jump straight into Step 1.
     return RedirectResponse(url=f"/game/{new_game['id']}/round/1", status_code=303)
 
 
@@ -100,7 +100,9 @@ def round_screen(request: Request, game_id: str, n: int) -> HTMLResponse:
     current = storage.get_game(game_id)
     if current is None:
         return _error_page(request, "That game was not found.", "/", status_code=404)
-    if current.get("finished"):
+    # All 3 steps played -> the reveal (which scores lazily if not yet scored).
+    # next_step == 0 covers both the scored (finished) and not-yet-scored states.
+    if game.next_step(current) == 0:
         return RedirectResponse(url=f"/game/{game_id}/reveal", status_code=303)
 
     expected = game.next_step(current)  # the step the group must play now
@@ -164,7 +166,9 @@ def submit_round(request: Request, game_id: str, n: int, prompt: str = Form(""))
     except (StorageNotConfigured, ValueError) as exc:
         return _error_page(request, str(exc), "/", status_code=400)
 
-    if updated.get("finished"):
+    # All 3 steps done -> reveal (it scores lazily). next_step == 0 means finished
+    # playing; scoring itself now happens on the reveal GET, not in this POST.
+    if game.next_step(updated) == 0:
         return RedirectResponse(url=f"/game/{game_id}/reveal", status_code=303)
     return RedirectResponse(url=f"/game/{game_id}/round/{n + 1}", status_code=303)
 
@@ -178,15 +182,28 @@ def reveal(request: Request, game_id: str) -> HTMLResponse:
         game_id: The game's id.
 
     Returns:
-        The reveal page, or an error/redirect if the game is missing/unfinished.
+        The reveal page, a redirect if the group still owes a step, or a retryable
+        error page if scoring failed (a refresh re-runs it).
     """
     current = storage.get_game(game_id)
     if current is None:
         return _error_page(request, "That game was not found.", "/", status_code=404)
-    if not current.get("finished"):
-        # Not scored yet — send the group back to the step they still owe.
+    if game.next_step(current) != 0:
+        # Not all 3 steps played yet — send the group to the step they still owe.
         return RedirectResponse(
             url=f"/game/{game_id}/round/{game.next_step(current)}", status_code=303
+        )
+
+    # All steps done: score lazily here (the heavy AI judge calls run in this GET,
+    # not in the step-3 POST). Idempotent — a no-op once already scored.
+    try:
+        current = game.ensure_scored(current)
+    except AllProvidersFailed as exc:
+        return _error_page(
+            request,
+            f"Scoring failed ({exc}). Refresh to try again.",
+            f"/game/{game_id}/reveal",
+            status_code=502,
         )
 
     reference = storage.get_reference(current["reference_id"])

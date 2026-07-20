@@ -226,8 +226,8 @@ def upload_generated_image(game_id: str, step: int, image_bytes: bytes) -> str:
 def fetch_image_bytes(url: str) -> bytes:
     """Download image bytes from a public Storage URL.
 
-    Used to obtain the current on-screen image so a later step can edit it and so
-    the final image can be scored. Public-bucket URLs are directly GET-able.
+    Used to obtain the final image bytes so the AI judge can score it. Public-bucket
+    URLs are directly GET-able.
 
     Args:
         url: The public image URL.
@@ -321,6 +321,25 @@ def insert_leaderboard(
     }
     result = _client().table("leaderboard").insert(payload).execute()
     return result.data[0]
+
+
+def leaderboard_has_game(game_id: str) -> bool:
+    """Return whether a leaderboard row already exists for a game.
+
+    Used to keep scoring idempotent: if the reveal page is scored twice (e.g. a
+    refresh during the ~20s judge calls), the second pass must not append a
+    duplicate leaderboard row.
+
+    Args:
+        game_id: The game's id.
+
+    Returns:
+        True if the leaderboard already has a row for this game.
+    """
+    result = (
+        _client().table("leaderboard").select("id").eq("game_id", game_id).limit(1).execute()
+    )
+    return bool(result.data)
 
 
 def list_leaderboard() -> List[dict]:

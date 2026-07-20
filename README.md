@@ -28,6 +28,9 @@ scores the final image out of 10, similarity breaks ties, and results land on a
    the first time anyone but Player 1 sees the original.
 6. Result is appended to the **leaderboard** (ranked by detail score, then similarity).
 
+**No talking or coaching** between players — the image is the only thing passed down
+the chain (that's what makes it broken telephone).
+
 Empty box at timeout = a forfeited turn (image kept unchanged). If Step 1 is
 forfeited, the base stays blank and the next non-empty prompt generates it.
 

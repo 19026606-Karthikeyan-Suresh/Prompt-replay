@@ -26,6 +26,13 @@ from .base import (
 # keeps uploads modest. Overridable here if larger art is desired.
 _IMAGE_SIZE = "1024x1024"
 
+# Bound each OpenAI call so a slow/hung request fails within budget instead of
+# blocking until a serverless function timeout kills the whole request. On
+# failure the fallback chain advances (to the mock if enabled) or raises
+# AllProvidersFailed (retryable) rather than hanging indefinitely.
+_REQUEST_TIMEOUT_S = 60.0
+_MAX_RETRIES = 1
+
 
 def _b64_data_url(image_bytes: bytes) -> str:
     """Encode image bytes as a base64 PNG data URL for the vision API.
@@ -56,7 +63,9 @@ class OpenAIImageProvider(ImageProvider):
         """
         from openai import OpenAI  # lazy: only needed when configured
 
-        self._client = OpenAI(api_key=api_key)
+        self._client = OpenAI(
+            api_key=api_key, timeout=_REQUEST_TIMEOUT_S, max_retries=_MAX_RETRIES
+        )
         self._model = model
         self._quality = quality
 
@@ -120,7 +129,9 @@ class OpenAIJudge(DetailJudge):
         """
         from openai import OpenAI  # lazy import
 
-        self._client = OpenAI(api_key=api_key)
+        self._client = OpenAI(
+            api_key=api_key, timeout=_REQUEST_TIMEOUT_S, max_retries=_MAX_RETRIES
+        )
         self._model = model
 
     def score(self, image_bytes: bytes, details: List[str]) -> JudgeResult:

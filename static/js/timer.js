@@ -7,9 +7,9 @@
  *                  "redirect" -> navigate to the URL in data-target
  *   data-target  : form id (submit mode) or URL (redirect mode)
  *
- * On the round page the "submit" mode auto-submits whatever is typed when the
- * timer reaches 0 (the hard 30s cap). On the reference page the "redirect" mode
- * hides the reference and moves the group to Step 1.
+ * The round page uses "submit" mode: it auto-submits whatever is typed when the
+ * timer reaches 0 (the hard 30s cap). ("redirect" mode is supported but currently
+ * unused — it navigates to a URL when the timer expires.)
  */
 (function () {
     "use strict";

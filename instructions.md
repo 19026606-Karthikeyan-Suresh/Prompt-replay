@@ -7,6 +7,7 @@ A **broken-telephone** prompting party game. A group passes a **target image** �
 - Players work in **groups of 3–4**.
 - Each group is assigned one pre-made target image built from a fixed set of **10 details**.
 - **Only player 1 sees the target.** Every later player sees only the image the previous player produced — not the target — and describes it so the AI redraws it.
+- **No talking or coaching** between players — the image is the only thing passed on. That is what makes it broken telephone.
 - The group takes **3 turns** ("steps"). On each turn one member (or a pair) has **30 seconds** to type a prompt; when the timer hits 0 the prompt is auto-submitted and the AI draws a fresh image from it.
 - At the end, the target and its 10 details are shown alongside the relay and an AI judge scores the final image out of 10.
 - One group plays at a time; results go on a shared **leaderboard**.

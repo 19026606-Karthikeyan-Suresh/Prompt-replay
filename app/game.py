@@ -31,7 +31,7 @@ def latest_image_url(game: dict) -> Optional[str]:
     """Return the most recent non-null step image URL, or None if still blank.
 
     Steps run in order, so scanning steps 3→1 yields the latest image actually
-    produced. This is the "current on-screen image" players describe and edit.
+    produced — the previous player's image that the next player describes.
 
     Args:
         game: A game row dict with ``image_url_1..3`` keys.
@@ -121,7 +121,12 @@ def create_new_game(group_name: str, group_size: int) -> dict:
 
 
 def submit_prompt(game_id: str, step: int, prompt: str) -> dict:
-    """Apply one step's prompt: generate/edit/carry, persist, and maybe finish.
+    """Apply one step's prompt: generate or carry, then persist and advance.
+
+    Scoring is intentionally NOT done here. After step 3 the relay is complete but
+    unscored (``current_step == TOTAL_STEPS``, ``finished`` still False); the reveal
+    page scores it lazily via :func:`ensure_scored`. This keeps every request to a
+    single AI call so none of them exceeds a serverless function timeout.
 
     Args:
         game_id: The game's id.
@@ -129,7 +134,7 @@ def submit_prompt(game_id: str, step: int, prompt: str) -> dict:
         prompt: The submitted prompt text (may be empty on a timed-out turn).
 
     Returns:
-        The updated game row dict. After step 3 it also carries the final scores.
+        The updated game row dict.
 
     Raises:
         ValueError: If the game does not exist, or the step is out of range.
@@ -162,9 +167,24 @@ def submit_prompt(game_id: str, step: int, prompt: str) -> dict:
         f"image_url_{step}": new_url,
         "current_step": step,
     }
-    game = storage.update_game(game_id, updates)
+    # Scoring happens later on the reveal page (see ensure_scored), not here.
+    return storage.update_game(game_id, updates)
 
-    # After the final step, score the result and publish to the leaderboard.
-    if step == TOTAL_STEPS:
-        game = scoring.finalize_game(game, latest_image_url(game))
-    return game
+
+def ensure_scored(game: dict) -> dict:
+    """Score a completed-but-unscored game (lazy finalize on the reveal page).
+
+    Idempotent: if the game is already ``finished`` (scored + on the leaderboard),
+    it is returned unchanged. Otherwise it runs the AI judge, persists the scores,
+    and appends the leaderboard row. Running this here (on the reveal GET) rather
+    than inside the step-3 POST keeps each request to a single AI call.
+
+    Args:
+        game: The game row dict; expected to have all 3 steps recorded.
+
+    Returns:
+        The scored game row dict (``finished`` True).
+    """
+    if game.get("finished"):
+        return game
+    return scoring.finalize_game(game, latest_image_url(game))

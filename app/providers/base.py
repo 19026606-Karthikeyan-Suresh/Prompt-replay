@@ -3,7 +3,9 @@
 Two capabilities are abstracted:
 
 * :class:`ImageProvider` — turn a text prompt into an image (``generate``) or
-  edit an existing image with a text prompt (``edit``).
+  edit an existing image with a text prompt (``edit``). Note: the broken-telephone
+  game only ever calls ``generate`` (every turn redraws from the player's words);
+  ``edit`` is kept for interface completeness / possible future use.
 * :class:`DetailJudge` — score a final image against the 10 target details and
   rate visual similarity between two images.
 

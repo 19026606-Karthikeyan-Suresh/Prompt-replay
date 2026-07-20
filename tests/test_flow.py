@@ -11,7 +11,7 @@ import uuid
 
 import pytest
 
-from app import game, storage
+from app import game, scoring, storage
 from app.storage import load_references
 
 
@@ -87,6 +87,10 @@ class FakeStore:
         self.leaderboard.append(row)
         return row
 
+    def leaderboard_has_game(self, game_id):
+        """Return whether a leaderboard row already exists for a game."""
+        return any(r["game_id"] == game_id for r in self.leaderboard)
+
 
 @pytest.fixture
 def fake_store(monkeypatch):
@@ -102,14 +106,14 @@ def fake_store(monkeypatch):
     for attr in (
         "assign_reference", "get_reference", "ensure_reference_uploaded",
         "create_game", "get_game", "update_game", "upload_generated_image",
-        "fetch_image_bytes", "insert_leaderboard",
+        "fetch_image_bytes", "insert_leaderboard", "leaderboard_has_game",
     ):
         monkeypatch.setattr(storage, attr, getattr(store, attr))
     return store
 
 
 def test_full_relay_three_person(fake_store):
-    """A full 3-step relay redraws each turn, scores, and posts a result."""
+    """A full 3-step relay redraws each turn; the reveal scores it lazily."""
     new_game = game.create_new_game("Test Crew", 3)
     gid = new_game["id"]
 
@@ -123,11 +127,19 @@ def test_full_relay_three_person(fake_store):
     assert g2["image_url_2"] is not None
     assert g2["image_url_2"] != g2["image_url_1"]
 
-    # Step 3 redraws again and finalizes.
+    # Step 3 records the final image but does NOT score yet (scoring is lazy,
+    # done on the reveal page so no single request runs 3 AI calls).
     g3 = game.submit_prompt(gid, 3, "a striped beach ball and a bright orange sun")
-    assert g3["finished"] is True
-    assert 0 <= g3["detail_score"] <= 10
-    assert g3["judge_result"]["total"] == g3["detail_score"]
+    assert g3["current_step"] == 3
+    assert g3["image_url_3"] is not None
+    assert not g3.get("finished")
+    assert len(fake_store.leaderboard) == 0
+
+    # The reveal page scores it lazily.
+    scored = game.ensure_scored(g3)
+    assert scored["finished"] is True
+    assert 0 <= scored["detail_score"] <= 10
+    assert scored["judge_result"]["total"] == scored["detail_score"]
 
     # The result was published to the leaderboard exactly once.
     assert len(fake_store.leaderboard) == 1
@@ -135,7 +147,7 @@ def test_full_relay_three_person(fake_store):
 
     # Broken telephone: the final image is redrawn from ONLY the last player's
     # prompt, so mock scoring credits step-3 details and drops earlier ones.
-    present = {v["detail"]: v["present"] for v in g3["judge_result"]["verdicts"]}
+    present = {v["detail"]: v["present"] for v in scored["judge_result"]["verdicts"]}
     assert present["a striped beach ball"] is True   # named in step 3
     assert present["a bright orange sun"] is True     # named in step 3
     assert present["a green surfboard"] is False      # named only in step 2 — lost
@@ -155,9 +167,14 @@ def test_empty_step1_defers_base_generation(fake_store):
     g2 = game.submit_prompt(gid, 2, "a green surfboard and a red bucket")
     assert g2["image_url_2"] is not None
 
-    # Step 3 edits and finishes.
-    g3 = game.submit_prompt(gid, 3, "add a white seagull")
-    assert g3["finished"] is True
+    # Step 3 records the final image; scoring is deferred to the reveal page.
+    g3 = game.submit_prompt(gid, 3, "a white seagull")
+    assert g3["current_step"] == 3
+    assert not g3.get("finished")
+
+    # Reveal scores it and posts exactly one leaderboard row.
+    scored = game.ensure_scored(g3)
+    assert scored["finished"] is True
     assert len(fake_store.leaderboard) == 1
 
 
@@ -170,3 +187,38 @@ def test_duplicate_submit_is_idempotent(fake_store):
     # A stale duplicate submit for step 1 should be a no-op.
     game.submit_prompt(gid, 1, "something else entirely")
     assert fake_store.games[gid]["image_url_1"] == first_url
+
+
+def test_ensure_scored_twice_posts_one_row(fake_store):
+    """Scoring the reveal twice (e.g. a refresh) does not double-post."""
+    new_game = game.create_new_game("Repeaters", 3)
+    gid = new_game["id"]
+    game.submit_prompt(gid, 1, "a red bucket")
+    game.submit_prompt(gid, 2, "a blue starfish")
+    g3 = game.submit_prompt(gid, 3, "a white seagull")
+
+    first = game.ensure_scored(g3)
+    assert first["finished"] is True
+    assert len(fake_store.leaderboard) == 1
+
+    # Already finished -> a no-op; no duplicate leaderboard row.
+    again = game.ensure_scored(first)
+    assert again["finished"] is True
+    assert len(fake_store.leaderboard) == 1
+
+
+def test_racing_finalize_posts_one_row(fake_store):
+    """Two concurrent scoring passes (both see finished=False) still post once.
+
+    Exercises the leaderboard_has_game guard directly: both calls compute scores
+    from the same unscored row, but only the first appends a leaderboard row.
+    """
+    new_game = game.create_new_game("Racers", 3)
+    gid = new_game["id"]
+    game.submit_prompt(gid, 1, "a red bucket")
+    game.submit_prompt(gid, 2, "a blue starfish")
+    g3 = game.submit_prompt(gid, 3, "a white seagull")
+
+    scoring.finalize_game(g3, game.latest_image_url(g3))
+    scoring.finalize_game(g3, game.latest_image_url(g3))  # g3 still shows finished=False
+    assert len(fake_store.leaderboard) == 1
