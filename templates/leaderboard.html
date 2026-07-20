@@ -9,6 +9,31 @@
     </div>
     <p class="lede">Ranked by details captured, then similarity as the tiebreaker. New results appear the moment a group finishes.</p>
 
+    {# Winners podium — up to three medal tiers by distinct score. Every group tied
+       at a score is featured together, so a band with 2+ cards is a tie.
+       leaderboard.js rebuilds this in the same pass as the table, so tiers grow
+       live as new results land. #}
+    <div class="podium" id="podium"{% if not podium_tiers %} style="display:none"{% endif %}>
+        {% for tier in podium_tiers %}
+        <div class="podium-tier tier-{{ loop.index }}">
+            <div class="tier-head">
+                <span class="tier-medal">{{ tier.medal }}</span>
+                <span class="tier-label">{% if tier.groups | length > 1 %}Tied for {{ tier.label }} · {{ tier.groups | length }} groups{% else %}{{ tier.label }}{% endif %}</span>
+            </div>
+            <div class="tier-groups">
+                {% for g in tier.groups %}
+                <div class="podium-place">
+                    {% if g.final_image_url %}<img class="podium-thumb" src="{{ g.final_image_url }}" alt="" />{% endif %}
+                    <div class="podium-name">{{ g.group_name }}</div>
+                    <span class="pill">{{ g.detail_score }} / 10</span>
+                    <div class="podium-sim">{{ (g.similarity * 100) | round | int }}% similar</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
     <div class="table-wrap">
         <table class="leaderboard">
             <thead>

@@ -50,6 +50,91 @@ function escapeHtml(value) {
     return div.innerHTML;
 }
 
+// Medal glyph + label per podium tier (index 0 = top score). Mirrors
+// _PODIUM_MEDALS in app/main.py — keep the two in sync.
+const MEDALS = ["🥇", "🥈", "🥉"];
+const LABELS = ["Gold", "Silver", "Bronze"];
+
+/**
+ * Score key that defines a medal tier: detail score + displayed similarity %.
+ * Mirrors `_tier_key()` in app/main.py; equal keys share a tier.
+ * @param {object} r - A leaderboard row.
+ * @returns {string} A stable tier key.
+ */
+function tierKey(r) {
+    return r.detail_score + ":" + Math.round((Number(r.similarity) || 0) * 100);
+}
+
+/**
+ * Group rank-ordered rows into up to `count` medal tiers. Consecutive rows
+ * sharing a `tierKey` form one tier, so every group tied at a score is featured
+ * together. Mirrors `top_tiers()` in app/main.py.
+ * @param {object[]} sortedRows - Rows already sorted by rankCompare.
+ * @param {number} [count=3] - Maximum number of tiers.
+ * @returns {object[]} Tiers: { medal, label, groups: [] }.
+ */
+function topTiers(sortedRows, count) {
+    const max = count || 3;
+    const tiers = [];
+    for (const r of sortedRows) {
+        const key = tierKey(r);
+        const last = tiers[tiers.length - 1];
+        if (last && last.key === key) {
+            last.groups.push(r);
+        } else if (tiers.length < max) {
+            tiers.push({ key: key, medal: MEDALS[tiers.length], label: LABELS[tiers.length], groups: [r] });
+        } else {
+            break;
+        }
+    }
+    return tiers;
+}
+
+/**
+ * Render the winners podium as medal tiers from the already-sorted `rows`.
+ * Mirrors the server-rendered markup (and header wording) in leaderboard.html.
+ * Hidden when there are no rows.
+ * @param {string|null} highlightId - id of a group card to flash as newly added.
+ */
+function renderPodium(highlightId) {
+    const podium = document.getElementById("podium");
+    if (!podium) return;
+
+    const tiers = topTiers(rows, 3);
+    podium.style.display = tiers.length ? "" : "none";
+    podium.innerHTML = tiers
+        .map(function (tier, i) {
+            const label = tier.groups.length > 1
+                ? "Tied for " + tier.label + " · " + tier.groups.length + " groups"
+                : tier.label;
+            const cards = tier.groups
+                .map(function (g) {
+                    const pct = Math.round((Number(g.similarity) || 0) * 100);
+                    const thumb = g.final_image_url
+                        ? '<img class="podium-thumb" src="' + escapeHtml(g.final_image_url) + '" alt="" />'
+                        : "";
+                    const flash = g.id && g.id === highlightId ? " row-new" : "";
+                    return (
+                        '<div class="podium-place' + flash + '">' +
+                        thumb +
+                        '<div class="podium-name">' + escapeHtml(g.group_name) + "</div>" +
+                        '<span class="pill">' + escapeHtml(g.detail_score) + " / 10</span>" +
+                        '<div class="podium-sim">' + pct + "% similar</div>" +
+                        "</div>"
+                    );
+                })
+                .join("");
+            return (
+                '<div class="podium-tier tier-' + (i + 1) + '">' +
+                '<div class="tier-head"><span class="tier-medal">' + tier.medal + "</span>" +
+                '<span class="tier-label">' + escapeHtml(label) + "</span></div>" +
+                '<div class="tier-groups">' + cards + "</div>" +
+                "</div>"
+            );
+        })
+        .join("");
+}
+
 /**
  * Render the current `rows` into the table body, ranked.
  * @param {string|null} highlightId - id of a row to flash as newly added.
@@ -60,6 +145,7 @@ function render(highlightId) {
     if (!body) return;
 
     rows.sort(rankCompare);
+    renderPodium(highlightId);
     body.innerHTML = rows
         .map(function (r, i) {
             const pct = Math.round((Number(r.similarity) || 0) * 100);

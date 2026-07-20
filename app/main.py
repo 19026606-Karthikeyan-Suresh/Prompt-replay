@@ -241,6 +241,57 @@ def reveal(request: Request, game_id: str) -> HTMLResponse:
     )
 
 
+# Medal glyph + label per podium tier (index 0 = top score). Mirrors MEDALS /
+# LABELS in static/js/leaderboard.js — keep the two in sync.
+_PODIUM_MEDALS = [("🥇", "Gold"), ("🥈", "Silver"), ("🥉", "Bronze")]
+
+
+def _tier_key(row: dict) -> tuple:
+    """Score key that defines a medal tier: detail score + displayed similarity %.
+
+    Similarity is keyed on its rounded percentage — the value players actually
+    see — so two groups both shown as "75%" share a tier even if their raw floats
+    differ by a hair. Mirrors ``tierKey()`` in static/js/leaderboard.js.
+
+    Args:
+        row: A leaderboard row.
+
+    Returns:
+        A hashable key; rows with equal keys belong to the same medal tier.
+    """
+    return (row["detail_score"], round(float(row["similarity"] or 0) * 100))
+
+
+def top_tiers(rows: list, count: int = 3) -> list:
+    """Group rank-ordered leaderboard rows into up to ``count`` medal tiers.
+
+    Consecutive rows sharing a :func:`_tier_key` form one tier, so every group
+    tied at a score is featured together (a tier with 2+ groups is a tie). ``rows``
+    must already be in rank order — as returned by
+    :func:`storage.list_leaderboard` — which keeps equal-key rows contiguous, so a
+    single linear pass suffices. Mirrors ``topTiers()`` in
+    static/js/leaderboard.js.
+
+    Args:
+        rows: Leaderboard rows in rank order.
+        count: Maximum number of medal tiers to build (default 3).
+
+    Returns:
+        A list of tier dicts: ``{"medal", "label", "groups": [row, ...]}``.
+    """
+    tiers: list = []
+    for row in rows:
+        key = _tier_key(row)
+        if tiers and tiers[-1]["key"] == key:
+            tiers[-1]["groups"].append(row)
+        elif len(tiers) < count:
+            medal, label = _PODIUM_MEDALS[len(tiers)]
+            tiers.append({"key": key, "medal": medal, "label": label, "groups": [row]})
+        else:
+            break
+    return tiers
+
+
 @app.get("/leaderboard", response_class=HTMLResponse)
 def leaderboard(request: Request) -> HTMLResponse:
     """Render the ranked leaderboard and wire up live realtime updates.
@@ -265,6 +316,8 @@ def leaderboard(request: Request) -> HTMLResponse:
         "leaderboard.html",
         {
             "rows": rows,
+            # Top-3 medal tiers (ties featured) for the winners podium.
+            "podium_tiers": top_tiers(rows),
             # Public, read-only credentials — safe to embed in the page.
             "supabase_url": settings.supabase_url,
             "supabase_anon_key": settings.supabase_anon_key,
