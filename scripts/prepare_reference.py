@@ -6,8 +6,13 @@ the game uses (so the target is achievable in-game), saves it under
 configured — uploads it to the public Storage bucket and records the URL.
 
 Usage:
-    # Seed the committed sample pool (uses the mock provider if no keys set):
+    # Seed the committed sample pool (uses the mock provider if no keys set).
+    # Targets that already have an image.png + details.json are skipped:
     python scripts/prepare_reference.py --seed
+
+    # Regenerate EVERY target at a higher quality tier than live gameplay uses
+    # (--quality overrides OPENAI_IMAGE_QUALITY for this run only):
+    python scripts/prepare_reference.py --seed --force --quality high
 
     # Create one reference from explicit details:
     python scripts/prepare_reference.py --id beach-day \\
@@ -86,6 +91,91 @@ SEED_REFERENCES = [
             "a stream of bubbles",
         ],
     },
+    {
+        "id": "space-station",
+        "details": [
+            "a silver rocket ship", "a white astronaut", "a red planet with rings",
+            "a yellow crescent moon", "a blue Earth", "a bright yellow star",
+            "a gray satellite", "a green alien", "a shining comet", "a small planted flag",
+        ],
+    },
+    {
+        "id": "city-park",
+        "details": [
+            "a red picnic blanket", "a wicker picnic basket", "a green park bench",
+            "a tall oak tree", "a blue kite", "a brown dog", "a white duck on a pond",
+            "a red bicycle", "a yellow frisbee", "a purple flower bush",
+        ],
+    },
+    {
+        "id": "birthday-party",
+        "details": [
+            "a chocolate birthday cake", "a bunch of colorful balloons",
+            "a wrapped gift box with a red bow", "a pointed party hat", "a lit candle",
+            "a coiled paper streamer", "a cup of orange juice", "a plate of pink cupcakes",
+            "a striped drinking straw", "a slice of watermelon",
+        ],
+    },
+    {
+        "id": "jungle-safari",
+        "details": [
+            "a spotted giraffe", "a gray elephant", "a striped zebra", "a green palm tree",
+            "a red parrot", "a brown monkey", "a coiled green snake", "a yellow lion",
+            "a blue waterfall", "a wooden safari jeep",
+        ],
+    },
+    {
+        "id": "desert-oasis",
+        "details": [
+            "a tall green cactus", "a brown camel", "a golden sand dune", "a small blue pond",
+            "a cluster of date palms", "a low red sun", "a green lizard", "a white desert tent",
+            "a pink flamingo", "a scattered pile of rocks",
+        ],
+    },
+    {
+        "id": "music-concert",
+        "details": [
+            "a red electric guitar", "a large bass drum", "a silver microphone on a stand",
+            "a bright spotlight", "a tall speaker", "a black grand piano",
+            "a pair of golden cymbals", "a colorful crowd", "a blue stage curtain",
+            "a single music note",
+        ],
+    },
+    {
+        "id": "autumn-forest",
+        "details": [
+            "a tall orange maple tree", "a pile of red leaves", "a brown squirrel",
+            "a red mushroom with white spots", "a wooden footbridge", "a small stream",
+            "a brown owl on a branch", "a basket of apples", "a red fox", "a gray stone path",
+        ],
+    },
+    {
+        "id": "soccer-stadium",
+        "details": [
+            "a black-and-white soccer ball", "a white goal net", "a green grass field",
+            "a player in a red jersey", "a goalkeeper in gloves", "a corner flag",
+            "a crowd of fans", "a pair of cleats", "a whistle on a lanyard",
+            "a blue sky with clouds",
+        ],
+    },
+    {
+        "id": "carnival-fair",
+        "details": [
+            "a colorful Ferris wheel", "a red-and-white striped tent", "a swirl of cotton candy",
+            "a caramel apple", "a wooden carousel horse", "a bunch of balloons",
+            "a popcorn cart", "a spinning teacup ride", "a prize game booth",
+            "a hot dog with mustard",
+        ],
+    },
+    {
+        "id": "toy-room",
+        "details": [
+            "a red toy car", "a brown teddy bear", "a stack of wooden blocks",
+            "a yellow rubber duck", "a green dinosaur figure", "a spinning top",
+            "a small toy train", "a rag doll", "a bouncy red ball",
+            "a colorful building-block tower",
+        ],
+    },
 ]
 
 
@@ -144,13 +234,27 @@ def create_reference(ref_id: str, details: list[str], upload: bool = True) -> st
     return image_path
 
 
-def _seed(upload: bool) -> None:
-    """Create every built-in sample reference.
+def _seed(upload: bool, force: bool = False) -> None:
+    """Create the built-in sample references, skipping ones already generated.
+
+    Seeding is idempotent by default: a target that already has both ``image.png``
+    and ``details.json`` on disk is left untouched, so re-running ``--seed`` after
+    adding new targets only fills in the missing ones (and never overwrites the
+    existing, already-good images with fresh random ones). Pass ``force=True`` to
+    regenerate every target regardless.
 
     Args:
         upload: Whether to upload each to Storage (if Supabase is configured).
+        force: Regenerate every target even if its files already exist.
     """
     for ref in SEED_REFERENCES:
+        ref_dir = os.path.join(_REFERENCES_DIR, ref["id"])
+        already_seeded = os.path.isfile(os.path.join(ref_dir, "image.png")) and os.path.isfile(
+            os.path.join(ref_dir, "details.json")
+        )
+        if already_seeded and not force:
+            print(f"[prepare_reference] {ref['id']}: exists, skipping (use --force to regenerate)")
+            continue
         create_reference(ref["id"], ref["details"], upload=upload)
 
 
@@ -162,12 +266,32 @@ def main() -> None:
     parser.add_argument("--details", nargs="+", help="Exactly 10 detail phrases.")
     parser.add_argument("--from-json", help="Path to a JSON file with {id, details}.")
     parser.add_argument("--no-upload", action="store_true", help="Do not upload to Storage.")
+    parser.add_argument(
+        "--force", action="store_true",
+        help="With --seed, regenerate targets even if they already exist on disk.",
+    )
+    parser.add_argument(
+        "--quality", choices=["low", "medium", "high", "auto"],
+        help="Image quality tier for THIS run only (default: OPENAI_IMAGE_QUALITY). "
+             "Reference art is usually generated higher than the in-game setting.",
+    )
     args = parser.parse_args()
+
+    # OPENAI_IMAGE_QUALITY is a global knob shared with live gameplay, where it is
+    # deliberately kept low (cheaper + fast enough to dodge serverless timeouts).
+    # Reference art is generated once, offline, so it can afford a higher tier —
+    # override the env for this process only, then rebuild the cached settings and
+    # provider chain so the new tier actually takes effect.
+    if args.quality:
+        os.environ["OPENAI_IMAGE_QUALITY"] = args.quality
+        get_settings.cache_clear()
+        build_image_provider.cache_clear()
+        print(f"[prepare_reference] image quality for this run: {args.quality}")
 
     upload = not args.no_upload
 
     if args.seed:
-        _seed(upload)
+        _seed(upload, force=args.force)
     elif args.from_json:
         with open(args.from_json, "r", encoding="utf-8") as fh:
             data = json.load(fh)

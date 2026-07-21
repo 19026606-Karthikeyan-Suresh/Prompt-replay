@@ -23,6 +23,11 @@ from .config import get_settings
 # Absolute path to the committed reference pool folder (references/<id>/...).
 _REFERENCES_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "references")
 
+# The most groups a single target ("original picture") may be handed to. Groups
+# play in turn, so a repeated target is what an earlier group could leak to a
+# later one — capping assignment keeps each target fresh for at most two groups.
+MAX_GROUPS_PER_REFERENCE = 2
+
 
 @dataclass
 class Reference:
@@ -145,8 +150,36 @@ def ensure_reference_uploaded(ref: Reference) -> str:
     return ref.public_url
 
 
-def assign_reference() -> Reference:
+def reference_usage_counts() -> Dict[str, int]:
+    """Count how many games have already been assigned each reference.
+
+    A game row is created (and its reference shown to Player 1) the moment a group
+    starts, so tallying ``games`` rows by ``reference_id`` is the right measure of
+    "how many groups have seen this target." One lightweight select suffices for an
+    event's game volume.
+
+    Returns:
+        A dict mapping ``reference_id`` -> number of games that used it.
+    """
+    result = _client().table("games").select("reference_id").execute()
+    counts: Dict[str, int] = {}
+    for row in result.data or []:
+        rid = row.get("reference_id")
+        if rid:
+            counts[rid] = counts.get(rid, 0) + 1
+    return counts
+
+
+def assign_reference(max_per_reference: int = MAX_GROUPS_PER_REFERENCE) -> Reference:
     """Pick a reference from the pool and ensure it is uploaded to Storage.
+
+    Assignment prefers targets shown to fewer than ``max_per_reference`` groups so
+    no single target repeats too often. When every target has hit the cap (a very
+    large turnout), it degrades gracefully to a randomly chosen *least-used* target
+    rather than blocking the group from starting.
+
+    Args:
+        max_per_reference: Cap on how many groups may be handed the same target.
 
     Returns:
         The assigned :class:`Reference`, with ``public_url`` populated.
@@ -159,8 +192,18 @@ def assign_reference() -> Reference:
         raise RuntimeError(
             "No references found. Run scripts/prepare_reference.py to seed the pool."
         )
-    # Random assignment keeps repeated games varied; order isn't meaningful.
-    ref = random.choice(list(pool.values()))
+    counts = reference_usage_counts()
+
+    under_cap = [ref for ref in pool.values() if counts.get(ref.id, 0) < max_per_reference]
+    if under_cap:
+        # Random among under-cap targets keeps games varied; a target drops out of
+        # this list once it reaches the cap, so it's never handed to a 3rd group.
+        ref = random.choice(under_cap)
+    else:
+        # Every target is at the cap — reuse the least-used one so play continues.
+        fewest = min(counts.get(ref.id, 0) for ref in pool.values())
+        ref = random.choice([ref for ref in pool.values() if counts.get(ref.id, 0) == fewest])
+
     ensure_reference_uploaded(ref)
     return ref
 

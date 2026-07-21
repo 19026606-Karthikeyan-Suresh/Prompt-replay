@@ -12,7 +12,7 @@ import uuid
 import pytest
 
 from app import game, scoring, storage
-from app.storage import load_references
+from app.storage import Reference, load_references
 
 
 class FakeStore:
@@ -234,3 +234,27 @@ def test_racing_finalize_posts_one_row(fake_store):
     scoring.finalize_game(g3, game.latest_image_url(g3))
     scoring.finalize_game(g3, game.latest_image_url(g3))  # g3 still shows finished=False
     assert len(fake_store.leaderboard) == 1
+
+
+def _fake_ref(ref_id):
+    """A minimal in-memory reference for assignment-cap tests."""
+    return Reference(id=ref_id, details=[], local_image_path=f"{ref_id}.png")
+
+
+def test_assign_reference_respects_group_cap(monkeypatch):
+    """assign_reference skips capped targets and, when all capped, reuses the least-used."""
+    pool = {rid: _fake_ref(rid) for rid in ("a", "b", "c")}
+    monkeypatch.setattr(storage, "load_references", lambda: pool)
+    monkeypatch.setattr(storage, "ensure_reference_uploaded", lambda ref: "url")
+
+    # 'a' and 'b' are at the cap (2 groups each); only 'c' is under it.
+    monkeypatch.setattr(storage, "reference_usage_counts", lambda: {"a": 2, "b": 2, "c": 0})
+    for _ in range(30):
+        assert storage.assign_reference(max_per_reference=2).id == "c"
+
+    # Every target is at/over the cap -> fall back to the least-used only.
+    # 'a' has been used most (3); 'b' and 'c' are the least-used (2 each).
+    monkeypatch.setattr(storage, "reference_usage_counts", lambda: {"a": 3, "b": 2, "c": 2})
+    picks = {storage.assign_reference(max_per_reference=2).id for _ in range(60)}
+    assert picks <= {"b", "c"}  # never the most-used 'a'
+    assert "a" not in picks

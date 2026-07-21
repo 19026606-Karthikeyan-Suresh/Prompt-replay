@@ -91,14 +91,32 @@ Copy `.env.example` to `.env` and fill in:
 
 ### 4. Seed the reference pool
 
-A sample pool of three real illustrations (generated with `gpt-image-1`) is
-committed under `references/`, each containing all 10 of its target details. To
-(re)generate references with the configured image AI and upload them to Storage:
+A pool of fifteen real illustrations (generated with `gpt-image-1`) is defined
+under `references/`, each containing all 10 of its target details. To generate
+any missing targets with the configured image AI and upload them to Storage:
 
 ```bash
 python scripts/prepare_reference.py --seed          # uses your AI keys, or the mock
 python scripts/prepare_reference.py --seed --no-upload   # local only, no Storage
+python scripts/prepare_reference.py --seed --force  # regenerate ALL, overwriting existing
+
+# Regenerate every target as high-quality art (recommended for the reference pool):
+python scripts/prepare_reference.py --seed --force --quality high --no-upload
 ```
+
+`--seed` is idempotent: any target that already has an `image.png` + `details.json`
+is skipped, so re-running it only fills in newly added targets (use `--force` to
+regenerate everything).
+
+`--quality {low,medium,high,auto}` sets the image tier for **that run only**,
+overriding `OPENAI_IMAGE_QUALITY`. This matters because that env var is shared with
+live gameplay, where it is deliberately kept `low` — high-quality generation is much
+slower and risks the serverless function timeout mid-game. Reference art is made once,
+offline, so it can afford `high`; leave `OPENAI_IMAGE_QUALITY=low` in `.env` for play.
+
+Each target is assigned to at most **two groups** during play
+(`MAX_GROUPS_PER_REFERENCE` in `app/storage.py`); once all fifteen are used twice, the
+least-used target is reused so a large turnout never blocks a group.
 
 Create your own from 10 details:
 
