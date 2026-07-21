@@ -1,0 +1,16 @@
+{
+  "id": "toy-room",
+  "details": [
+    "a red toy car",
+    "a brown teddy bear",
+    "a stack of wooden blocks",
+    "a yellow rubber duck",
+    "a green dinosaur figure",
+    "a spinning top",
+    "a small toy train",
+    "a rag doll",
+    "a bouncy red ball",
+    "a colorful building-block tower"
+  ],
+  "public_url": "https://yusmuctcpvwqudhgkxmh.supabase.co/storage/v1/object/public/images/references/toy-room.png"
+}

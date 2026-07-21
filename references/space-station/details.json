@@ -1,0 +1,16 @@
+{
+  "id": "space-station",
+  "details": [
+    "a silver rocket ship",
+    "a white astronaut",
+    "a red planet with rings",
+    "a yellow crescent moon",
+    "a blue Earth",
+    "a bright yellow star",
+    "a gray satellite",
+    "a green alien",
+    "a shining comet",
+    "a small planted flag"
+  ],
+  "public_url": "https://yusmuctcpvwqudhgkxmh.supabase.co/storage/v1/object/public/images/references/space-station.png"
+}

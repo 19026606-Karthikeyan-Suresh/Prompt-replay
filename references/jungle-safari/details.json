@@ -1,0 +1,16 @@
+{
+  "id": "jungle-safari",
+  "details": [
+    "a spotted giraffe",
+    "a gray elephant",
+    "a striped zebra",
+    "a green palm tree",
+    "a red parrot",
+    "a brown monkey",
+    "a coiled green snake",
+    "a yellow lion",
+    "a blue waterfall",
+    "a wooden safari jeep"
+  ],
+  "public_url": "https://yusmuctcpvwqudhgkxmh.supabase.co/storage/v1/object/public/images/references/jungle-safari.png"
+}

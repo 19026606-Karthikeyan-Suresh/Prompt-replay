@@ -1,0 +1,16 @@
+{
+  "id": "city-park",
+  "details": [
+    "a red picnic blanket",
+    "a wicker picnic basket",
+    "a green park bench",
+    "a tall oak tree",
+    "a blue kite",
+    "a brown dog",
+    "a white duck on a pond",
+    "a red bicycle",
+    "a yellow frisbee",
+    "a purple flower bush"
+  ],
+  "public_url": "https://yusmuctcpvwqudhgkxmh.supabase.co/storage/v1/object/public/images/references/city-park.png"
+}
