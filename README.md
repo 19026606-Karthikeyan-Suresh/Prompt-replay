@@ -118,6 +118,24 @@ Each target is assigned to at most **two groups** during play
 (`MAX_GROUPS_PER_REFERENCE` in `app/storage.py`); once all fifteen are used twice, the
 least-used target is reused so a large turnout never blocks a group.
 
+#### Recovering a wiped Storage bucket
+
+If the reference images vanish from Supabase Storage (or get uploaded to the wrong
+paths), re-upload the committed local copies — **no regeneration, no AI cost**:
+
+```bash
+python scripts/prepare_reference.py --upload-only
+```
+
+The app serves each target from the **flat** path `references/<id>.png`. Dragging the
+local `references/` folder into the Supabase dashboard instead creates
+`references/<id>/image.png`, which nothing reads — every target then 404s. `--upload-only`
+puts the files where the app expects them and refreshes `details.json`.
+
+> **This does not self-heal on its own.** `storage.ensure_reference_uploaded()` returns
+> early whenever `details.json` already records a `public_url`, so a running app keeps
+> serving the dead link instead of re-uploading. You must run `--upload-only` explicitly.
+
 Create your own from 10 details:
 
 ```bash

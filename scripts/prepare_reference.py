@@ -14,6 +14,10 @@ Usage:
     # (--quality overrides OPENAI_IMAGE_QUALITY for this run only):
     python scripts/prepare_reference.py --seed --force --quality high
 
+    # Recover a wiped/incorrectly-uploaded Storage bucket: re-upload the committed
+    # images to references/<id>.png. No regeneration, so no AI cost:
+    python scripts/prepare_reference.py --upload-only
+
     # Create one reference from explicit details:
     python scripts/prepare_reference.py --id beach-day \\
         --details "a yellow beach umbrella" "a red bucket" ... (exactly 10)
@@ -179,6 +183,67 @@ SEED_REFERENCES = [
 ]
 
 
+def upload_only() -> int:
+    """Re-upload every committed reference image to Storage without regenerating.
+
+    Recovers from a wiped/incorrectly-uploaded Storage bucket at no AI cost. The
+    app serves reference images from the FLAT path ``references/<id>.png`` (see
+    :func:`app.storage.ensure_reference_uploaded`); uploading the local
+    ``references/`` tree by hand instead produces ``references/<id>/image.png``,
+    which nothing reads, so every recorded URL 404s.
+
+    This cannot self-heal at runtime: ``ensure_reference_uploaded`` returns early
+    when ``details.json`` already records a ``public_url``, so the app keeps
+    serving the dead link rather than re-uploading. Hence this explicit mode.
+
+    Uploads are upsert, so re-running is safe. ``details.json`` is rewritten only
+    when the URL actually changes, keeping a no-op run free of spurious diffs.
+
+    Returns:
+        The number of references successfully uploaded.
+    """
+    if not get_settings().supabase_configured:
+        raise SystemExit(
+            "Supabase is not configured — set SUPABASE_URL and SUPABASE_SERVICE_KEY "
+            "in your .env (see .env.example)."
+        )
+
+    references = storage.load_references()
+    if not references:
+        raise SystemExit(
+            "No references found on disk. Run --seed first to generate the pool."
+        )
+
+    print(f"[prepare_reference] re-uploading {len(references)} reference(s) to Storage")
+    uploaded = 0
+    for ref_id, ref in sorted(references.items()):
+        try:
+            image_bytes = storage.reference_image_bytes(ref)
+        except FileNotFoundError:
+            print(f"[prepare_reference] {ref_id}: SKIPPED — no local image.png")
+            continue
+
+        public_url = storage.upload_image(f"references/{ref_id}.png", image_bytes)
+        uploaded += 1
+
+        # Keep details.json in step with reality, but only rewrite on a real change.
+        details_path = os.path.join(_REFERENCES_DIR, ref_id, "details.json")
+        try:
+            with open(details_path, "r", encoding="utf-8") as fh:
+                meta = json.load(fh)
+        except (OSError, ValueError):
+            meta = {"id": ref_id, "details": list(ref.details)}
+        if meta.get("public_url") != public_url:
+            meta["public_url"] = public_url
+            with open(details_path, "w", encoding="utf-8") as fh:
+                json.dump(meta, fh, indent=2)
+
+        print(f"[prepare_reference] {ref_id}: uploaded ({len(image_bytes) // 1024} KB)")
+
+    print(f"[prepare_reference] done — {uploaded}/{len(references)} uploaded")
+    return uploaded
+
+
 def build_prompt(details: list[str]) -> str:
     """Compose a single text-to-image prompt from the 10 details.
 
@@ -262,6 +327,11 @@ def main() -> None:
     """Parse CLI arguments and create the requested reference(s)."""
     parser = argparse.ArgumentParser(description="Prepare Prompt Relay reference images.")
     parser.add_argument("--seed", action="store_true", help="Create the built-in sample pool.")
+    parser.add_argument(
+        "--upload-only", action="store_true",
+        help="Re-upload the committed reference images to Storage without "
+             "regenerating them (no AI cost). Use to recover a wiped bucket.",
+    )
     parser.add_argument("--id", help="Reference id / folder name.")
     parser.add_argument("--details", nargs="+", help="Exactly 10 detail phrases.")
     parser.add_argument("--from-json", help="Path to a JSON file with {id, details}.")
@@ -290,7 +360,11 @@ def main() -> None:
 
     upload = not args.no_upload
 
-    if args.seed:
+    if args.upload_only:
+        # Checked before --seed so the no-cost recovery path can never be
+        # confused with a regeneration run.
+        upload_only()
+    elif args.seed:
         _seed(upload, force=args.force)
     elif args.from_json:
         with open(args.from_json, "r", encoding="utf-8") as fh:
@@ -299,7 +373,9 @@ def main() -> None:
     elif args.id and args.details:
         create_reference(args.id, args.details, upload=upload)
     else:
-        parser.error("Provide --seed, --from-json, or both --id and --details.")
+        parser.error(
+            "Provide --seed, --upload-only, --from-json, or both --id and --details."
+        )
 
 
 if __name__ == "__main__":
