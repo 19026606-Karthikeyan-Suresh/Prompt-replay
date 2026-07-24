@@ -1,7 +1,7 @@
 # Prompt Relay
 
 A **broken-telephone** prompting party game. A group of 3–4 passes a **target
-image** — defined by exactly **10 details** — down a chain of three 30-second
+image** — defined by exactly **10 details** — down a chain of three 45-second
 prompts. **Only Player 1 sees the target**; they describe it and the AI draws a
 picture. Each later player sees **only the image the player before them made**,
 describes what they see, and the AI **redraws it from scratch** — so the picture
@@ -18,10 +18,10 @@ scores the final image out of 10, similarity breaks ties, and results land on a
 
 1. **Group name + size** entered → a game is created and a target assigned, then
    play jumps straight into Step 1.
-2. **Step 1** (Player 1): sees the **target** and has 30s to describe it → AI
+2. **Step 1** (Player 1): sees the **target** and has 45s to describe it → AI
    **draws** the base image.
 3. **Step 2** (Player 2): sees **only Player 1's image** (not the target), describes
-   it in 30s → AI **redraws** a fresh image from that description.
+   it in 45s → AI **redraws** a fresh image from that description.
 4. **Step 3** (Player 3, or Players 3 & 4 paired in a 4-person group): sees **only
    Player 2's image**, describes it → AI redraws the final image.
 5. **Reveal**: the target, the full relay, and a single **percentage** score — the
